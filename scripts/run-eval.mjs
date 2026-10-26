@@ -122,4 +122,6 @@ for (;;) {
   }
 }
 ws.close();
+// Close the tab so a later dev-server reload can't touch it.
+await fetch(`http://localhost:${CDP_PORT}/json/close/${target.id}`).catch(() => undefined);
 process.exit(0);

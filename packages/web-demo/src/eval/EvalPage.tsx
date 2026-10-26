@@ -144,7 +144,15 @@ export function EvalPage() {
 
   useEffect(() => {
     window.__evalStatus = status;
-    if (params.get("autostart") === "1") void run();
+    if (params.get("autostart") === "1") {
+      // Strip autostart from the URL before running: a Vite reload (any source
+      // edit) would otherwise silently restart the whole run under the same
+      // runId and append duplicate records. Observed once; see phase-8 log.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("autostart");
+      window.history.replaceState(null, "", url);
+      void run();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
