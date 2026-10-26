@@ -29,6 +29,12 @@ as it happened rather than reconstructed afterward.
   generic "logged for a future iteration" message. Search fix and timing badge
   live-verified in Chrome via CDP.
 
+- [Phase 8 — Real-model evidence, v3 prompt, code-side grounding](./phase-8-evidence-and-grounding.md) —
+  closes the Phase 2/3 gap: 672 real WebGPU runs (6 models × 4 prompt variants × 28
+  labeled cases) driven through headed Chrome. Adds `need_clarification`, a grounding
+  layer that enforces the policy's never-checked "same owner" condition, and
+  `evidence/REPORT.md`. Mobile on-device LLM deferred.
+
 ## Aggregated deviations from spec
 
 | # | What | Where | Why |

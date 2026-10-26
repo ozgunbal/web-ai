@@ -114,10 +114,11 @@ describe("grounded score (model + code)", () => {
     expect(r.grounded).toMatchObject({ status: "ok", verdict: "correct", pass: true });
   });
 
-  it("rejects a transfer larger than the source balance", async () => {
+  it("rejects a transfer larger than the source balance (a wrong amount here, so it is a caught error)", async () => {
     const out = '{"type":"transfer_internal","fromAccountId":"acc-checking-2","toAccountId":"acc-savings","amount":5000}';
     const r = await runEvalCase(engineReturning(out), caseById("v-transfer-3"), v1, meta);
-    expect(r.grounded).toMatchObject({ status: "rejected", verdict: "grounding_rejected", pass: false });
+    expect(r.grounded).toMatchObject({ status: "rejected", verdict: "wrong_caught", pass: false });
+    expect(r.grounded.reason).toMatch(/exceeds the available balance/);
   });
 
   it("a model's need_clarification on an ambiguous case passes even without grounding", async () => {
@@ -137,5 +138,14 @@ describe("v3 grounded schema", () => {
     const transfer = schema.anyOf.find((b) => b.properties.type!.const === "transfer_internal")!;
     expect(transfer.properties.toAccountId!.enum).toEqual(["acc-checking", "acc-savings", "acc-checking-2"]);
     expect(v3.options.systemPrompt).toContain("payee-landlord: Landlord");
+  });
+});
+
+describe("grounding on valid cases the model got wrong", () => {
+  it("counts a wrong parse that grounding stops as wrong_caught, not as a false refusal", async () => {
+    const out = '{"type":"transfer_internal","fromAccountId":"","toAccountId":"","amount":200}';
+    const r = await runEvalCase(engineReturning(out), caseById("v-transfer-1"), v1, meta);
+    expect(r.verdict).toBe("wrong_slots");
+    expect(r.grounded).toMatchObject({ status: "needs_clarification", verdict: "wrong_caught" });
   });
 });
