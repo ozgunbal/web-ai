@@ -1,0 +1,17 @@
+{
+  "name": "web-ai-trials",
+  "private": true,
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "test": "pnpm -r --filter=./packages/* test",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "demo:guardrail": "pnpm --filter @web-ai-trials/core demo:guardrail"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^1.6.1",
+    "@types/node": "^22.9.0"
+  }
+}

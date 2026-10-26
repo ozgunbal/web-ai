@@ -1,0 +1,27 @@
+{
+  "name": "@web-ai-trials/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./web": "./src/index.web.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:intent-parser": "vitest run src/intent-parser.bake.test.ts",
+    "demo:guardrail": "tsx src/cli/demo-guardrail.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no lint configured for core yet' && exit 0"
+  },
+  "dependencies": {
+    "zod": "4.5.2",
+    "@mlc-ai/web-llm": "0.2.84"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^1.6.1",
+    "tsx": "^4.19.2"
+  }
+}
