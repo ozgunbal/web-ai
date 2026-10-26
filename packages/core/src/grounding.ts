@@ -97,6 +97,8 @@ function worstMatch(matches: RefMatch[]): RefMatch | null {
 export function groundIntent(intent: Intent, ctx: UserContext, userText?: string): GroundingOutcome {
   const outcome = groundReferences(intent, ctx);
   if (outcome.status !== "ok" || userText === undefined) return outcome;
+  const filtered = dropUnmentionedFilters(outcome.intent, userText, ctx);
+  if (filtered !== outcome.intent) return { ...outcome, intent: filtered };
   const missing = unsupportedSlots(outcome.intent, userText, ctx);
   if (missing.length === 0) return outcome;
   return { status: "needs_clarification", intent, missing, question: questionFor(missing) };
@@ -226,6 +228,23 @@ function accountMentioned(id: string, text: string, ctx: UserContext): boolean {
 function payeeMentioned(id: string, text: string, ctx: UserContext): boolean {
   const payee = ctx.payees.find((p) => p.id === id);
   return payee !== undefined && words(payee.name).some((w) => mentions(text, w));
+}
+
+/**
+ * Read-only filters the user never mentioned are dropped rather than asked
+ * about: "how much do I have in total" must not become a checking-only total
+ * because the model added accountType (observed live).
+ */
+function dropUnmentionedFilters(intent: Intent, text: string, ctx: UserContext): Intent {
+  if (intent.type === "get_total_balance" && intent.accountType && !mentions(text, intent.accountType)) {
+    const { accountType: _dropped, ...rest } = intent;
+    return rest;
+  }
+  if (intent.type === "get_transactions" && intent.accountId && !accountMentioned(intent.accountId, text, ctx)) {
+    const { accountId: _dropped, ...rest } = intent;
+    return rest;
+  }
+  return intent;
 }
 
 /** Slots of a grounded intent whose value does not appear in the user's message. */

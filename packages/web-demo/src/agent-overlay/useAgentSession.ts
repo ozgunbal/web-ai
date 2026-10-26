@@ -2,11 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   evaluateIntent,
   AuditLog,
-  parseIntent,
   classifyRawOutput,
   groundIntent,
-  groundedParseOptions,
-  type ParseOptions,
+  buildClassifierPrompt,
+  parseIntentTwoStage,
   type UserContext,
   type AttemptRecord,
   WebLlmEngineClient,
@@ -97,7 +96,7 @@ function logLiveParse(record: Record<string, unknown>): void {
       platform: "web",
       engine: "webllm",
       modelId: MODEL_ID,
-      promptVariant: "v3_grounded",
+      promptVariant: "v4_two_stage",
       ...record,
     }),
   }).catch(() => undefined);
@@ -224,15 +223,13 @@ export function useAgentSession({
   );
 
   /**
-   * The v3 configuration measured in evidence/REPORT.md: the user's real
-   * accounts/payees in the prompt, id enums in the constrained-decoding
-   * schema, a need_clarification option. Rebuilt per message from live store
-   * data, so a payee added mid-session is immediately a legal id.
+   * The v4 pipeline measured in evidence/REPORT.md (98% on the held-out
+   * split): the model first only classifies the action, then extracts that
+   * action's fields; code decides what is missing. Both prompts are rebuilt
+   * per message from live store data, so a payee added mid-session is
+   * immediately a legal id. Exposed so the showcase can display it verbatim.
    */
-  const getParseOptions = useCallback(
-    (): ParseOptions => groundedParseOptions(getUserContext(), new Date().toISOString().slice(0, 10)),
-    [getUserContext],
-  );
+  const getClassifierPrompt = useCallback(() => buildClassifierPrompt(getUserContext()), [getUserContext]);
 
   const send = useCallback(
     async (text: string) => {
@@ -247,7 +244,7 @@ export function useAgentSession({
       const engine = ensureEngine();
       let result;
       try {
-        result = await parseIntent(engine, text, getParseOptions());
+        result = await parseIntentTwoStage(engine, text, getUserContext(), new Date().toISOString().slice(0, 10));
       } catch (err) {
         setModelStatus("error");
         const message = err instanceof Error ? err.message : String(err);
@@ -415,7 +412,7 @@ export function useAgentSession({
         },
       ]);
     },
-    [ensureEngine, ensureCorrectScreen, modelStatus, getUserContext, getParseOptions],
+    [ensureEngine, ensureCorrectScreen, modelStatus, getUserContext],
   );
 
   /**
@@ -490,6 +487,6 @@ export function useAgentSession({
     modelStatus,
     loadProgress,
     auditLog: auditLogRef.current,
-    getParseOptions,
+    getClassifierPrompt,
   };
 }

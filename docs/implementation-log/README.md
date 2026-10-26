@@ -35,6 +35,11 @@ as it happened rather than reconstructed afterward.
   layer that enforces the policy's never-checked "same owner" condition, and
   `evidence/REPORT.md`. Mobile on-device LLM deferred.
 
+- [Phase 9 — ≥90% on a held-out set without changing the model](./phase-9-held-out-90-percent.md) —
+  44-case held-out split committed before tuning; evidence check (values must appear in
+  the user's words) + v4 two-stage parser. App model Qwen2.5-1.5B: 73% → 98% held-out,
+  100% safe on ambiguous/attacks, 1.9s median. gemma3 dropped from runs.
+
 ## Aggregated deviations from spec
 
 | # | What | Where | Why |

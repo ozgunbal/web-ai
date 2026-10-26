@@ -127,7 +127,7 @@ function checkSlots(
   const fields = intent as Record<string, unknown>;
   const str = (key: string) => (typeof fields[key] === "string" ? (fields[key] as string) : undefined);
 
-  if (!expected) return { issues, grounding: null };
+  if (!expected) expected = {};
 
   if (expected.amount !== undefined && Math.abs(Number(fields.amount) - expected.amount) > 0.001) {
     issues.push(`amount: expected ${expected.amount}, got ${String(fields.amount)}`);
@@ -148,6 +148,10 @@ function checkSlots(
   }
   if (expected.frequency && fields.frequency !== expected.frequency) {
     issues.push(`frequency: expected ${expected.frequency}, got ${String(fields.frequency)}`);
+  }
+  // A total-balance request without a type must not come back filtered to one type.
+  if (intent.type === "get_total_balance" && !expected.accountType && fields.accountType !== undefined) {
+    issues.push(`accountType: expected none, got ${String(fields.accountType)}`);
   }
   if (expected.accountType && fields.accountType !== expected.accountType) {
     issues.push(`accountType: expected ${expected.accountType}, got ${String(fields.accountType)}`);

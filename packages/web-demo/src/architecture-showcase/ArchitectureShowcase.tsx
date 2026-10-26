@@ -35,8 +35,7 @@ export function ArchitectureShowcase({
   session: ReturnType<typeof useAgentSession>;
   onClose: () => void;
 }) {
-  const { messages, modelStatus, send, getParseOptions } = session;
-  const parseOptions = getParseOptions();
+  const { messages, modelStatus, send, getClassifierPrompt } = session;
   const isReady = modelStatus === "ready";
   const [pending, setPending] = useState(false);
 
@@ -103,16 +102,14 @@ export function ArchitectureShowcase({
           </section>
 
           <section className="showcase-section">
-            <h3 className="showcase-section-title">3 · System prompt sent to the on-device LLM</h3>
+            <h3 className="showcase-section-title">3 · Prompt sent to the on-device LLM (step 1 of 2)</h3>
             <p className="showcase-section-note">
-              Sent verbatim as a <code>system</code>-role message to the local WebLLM engine on
-              every turn, built from your current accounts and payees by{" "}
-              <code>buildGroundedPrompt</code> in <code>core/src/eval/prompts.ts</code> (the measured
-              "v3" prompt).{" "}
-              {parseOptions.responseFormat &&
-                "Decoding is constrained to a JSON schema in which account and payee ids can only be your real ones."}
+              Two model calls per message (<code>core/src/two-stage.ts</code>, "v4"). Step 1, below
+              verbatim, only picks the action, constrained to a fixed list. Step 2 extracts just that
+              action's details, with account and payee ids limited to your real ones. Code then
+              decides whether anything is missing and checks every value against your own words.
             </p>
-            <pre className="showcase-code-block">{parseOptions.systemPrompt}</pre>
+            <pre className="showcase-code-block">{getClassifierPrompt()}</pre>
           </section>
 
           <section className="showcase-section">

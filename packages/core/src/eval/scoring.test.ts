@@ -149,3 +149,11 @@ describe("grounding on valid cases the model got wrong", () => {
     expect(r.grounded).toMatchObject({ status: "needs_clarification", verdict: "wrong_caught" });
   });
 });
+
+describe("stricter total-balance scoring", () => {
+  it("an invented accountType on a plain total is wrong for the model, fixed by grounding", async () => {
+    const r = await runEvalCase(engineReturning('{"type":"get_total_balance","accountType":"checking"}'), caseById("v-total-1"), v1, meta);
+    expect(r.verdict).toBe("wrong_slots");
+    expect(r.grounded).toMatchObject({ verdict: "correct", pass: true });
+  });
+});

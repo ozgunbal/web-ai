@@ -17,7 +17,7 @@ vi.mock("@web-ai-trials/core/web", async () => {
   const actual = await vi.importActual<typeof import("@web-ai-trials/core/web")>("@web-ai-trials/core/web");
   return {
     ...actual,
-    parseIntent: vi.fn(),
+    parseIntentTwoStage: vi.fn(),
     WebLlmEngineClient: class {
       setProgressCallback() {}
       preload() {
@@ -28,7 +28,7 @@ vi.mock("@web-ai-trials/core/web", async () => {
 });
 
 import { useAgentSession } from "./useAgentSession";
-import { parseIntent } from "@web-ai-trials/core/web";
+import { parseIntentTwoStage } from "@web-ai-trials/core/web";
 
 function setDom(html: string) {
   document.body.innerHTML = html;
@@ -36,7 +36,7 @@ function setDom(html: string) {
 
 describe("useAgentSession — auto-navigation before execution", () => {
   beforeEach(() => {
-    vi.mocked(parseIntent).mockReset();
+    vi.mocked(parseIntentTwoStage).mockReset();
   });
 
   afterEach(() => {
@@ -44,7 +44,7 @@ describe("useAgentSession — auto-navigation before execution", () => {
   });
 
   it("rejects an injected transfer to an account the user doesn't own, even though the guardrail alone would auto-allow it", async () => {
-    vi.mocked(parseIntent).mockResolvedValue({
+    vi.mocked(parseIntentTwoStage).mockResolvedValue({
       ok: true,
       intent: {
         type: "transfer_internal",
@@ -75,7 +75,7 @@ describe("useAgentSession — auto-navigation before execution", () => {
   });
 
   it("answers a need_clarification intent with the model's question instead of acting", async () => {
-    vi.mocked(parseIntent).mockResolvedValue({
+    vi.mocked(parseIntentTwoStage).mockResolvedValue({
       ok: true,
       intent: { type: "need_clarification", rawInputSummary: "", missing: ["amount"], question: "How much should I send?" },
       retriesUsed: 0,
@@ -90,8 +90,8 @@ describe("useAgentSession — auto-navigation before execution", () => {
     expect(result.current.messages.at(-1)?.text).toBe("How much should I send?");
   });
 
-  it("sends the measured v3 options: real account ids in the prompt and a constrained-decoding schema", async () => {
-    vi.mocked(parseIntent).mockResolvedValue({
+  it("runs the measured v4 two-stage parser against the user's live accounts and payees", async () => {
+    vi.mocked(parseIntentTwoStage).mockResolvedValue({
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "" },
       retriesUsed: 0,
@@ -103,15 +103,17 @@ describe("useAgentSession — auto-navigation before execution", () => {
     await act(async () => {
       await result.current.send("show accounts");
     });
-    const options = vi.mocked(parseIntent).mock.calls[0]![2]!;
-    expect(options.systemPrompt).toContain("acc-checking: Everyday Checking");
-    expect(options.systemPrompt).toContain("payee-landlord: Landlord");
-    expect(JSON.parse(options.responseFormat!.schema).anyOf.length).toBe(8);
-    expect(options.repetitionPenalty).toBe(1.0);
+    const [, text, ctx, today] = vi.mocked(parseIntentTwoStage).mock.calls[0]!;
+    expect(text).toBe("show accounts");
+    expect(ctx.accounts.map((a) => a.id)).toContain("acc-checking-2");
+    expect(ctx.payees.map((p) => p.id)).toContain("payee-landlord");
+    expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(result.current.getClassifierPrompt()).toContain("Jane Smith, Landlord");
   });
 
+
   it("navigates to the accounts screen before executing a list_accounts intent, when currently elsewhere", async () => {
-    vi.mocked(parseIntent).mockResolvedValue({
+    vi.mocked(parseIntentTwoStage).mockResolvedValue({
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,
@@ -153,7 +155,7 @@ describe("useAgentSession — auto-navigation before execution", () => {
     // schedule_recurring_payment's policy decision is "confirm" (see
     // policy.config.ts), so the no-screen check only fires once the user
     // clicks Confirm on the resulting confirm-card, not on the initial send.
-    vi.mocked(parseIntent).mockResolvedValue({
+    vi.mocked(parseIntentTwoStage).mockResolvedValue({
       ok: true,
       intent: {
         type: "schedule_recurring_payment",
@@ -203,7 +205,7 @@ describe("useAgentSession — auto-navigation before execution", () => {
   });
 
   it("attaches a non-negative elapsedMs to every agent reply, and none to the user's own message", async () => {
-    vi.mocked(parseIntent).mockResolvedValue({
+    vi.mocked(parseIntentTwoStage).mockResolvedValue({
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,

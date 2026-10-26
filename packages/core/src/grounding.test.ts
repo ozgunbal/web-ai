@@ -73,3 +73,16 @@ describe("groundIntent with the user's text (evidence check)", () => {
     });
   });
 });
+
+describe("read-only filters the user never mentioned", () => {
+  it("drops an invented accountType instead of answering for one account type (observed live)", () => {
+    const g = groundIntent({ type: "get_total_balance", rawInputSummary: "", accountType: "checking" }, ctx, "how much do I have in total");
+    expect(g).toMatchObject({ status: "ok" });
+    expect(g.intent).not.toHaveProperty("accountType");
+  });
+
+  it("keeps a filter the user asked for", () => {
+    const g = groundIntent({ type: "get_total_balance", rawInputSummary: "", accountType: "savings" }, ctx, "whats my savings balance in total");
+    expect(g.intent).toMatchObject({ accountType: "savings" });
+  });
+});

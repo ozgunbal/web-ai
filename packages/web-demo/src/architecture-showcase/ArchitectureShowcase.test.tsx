@@ -7,7 +7,7 @@ vi.mock("@web-ai-trials/core/web", async () => {
   const actual = await vi.importActual<typeof import("@web-ai-trials/core/web")>("@web-ai-trials/core/web");
   return {
     ...actual,
-    parseIntent: vi.fn(),
+    parseIntentTwoStage: vi.fn(),
     WebLlmEngineClient: class {
       setProgressCallback() {}
       preload() {
@@ -18,7 +18,7 @@ vi.mock("@web-ai-trials/core/web", async () => {
 });
 
 import { useAgentSession } from "../agent-overlay/useAgentSession";
-import { parseIntent, POLICY_RULES } from "@web-ai-trials/core/web";
+import { parseIntentTwoStage, POLICY_RULES } from "@web-ai-trials/core/web";
 import { ArchitectureShowcase } from "./ArchitectureShowcase";
 
 function setDom(html: string) {
@@ -27,7 +27,7 @@ function setDom(html: string) {
 
 describe("ArchitectureShowcase", () => {
   beforeEach(() => {
-    vi.mocked(parseIntent).mockReset();
+    vi.mocked(parseIntentTwoStage).mockReset();
   });
   afterEach(() => {
     setDom("");
@@ -49,7 +49,7 @@ describe("ArchitectureShowcase", () => {
   });
 
   it("shows the real raw model output, parsed intent, and guardrail verdict after a turn", async () => {
-    vi.mocked(parseIntent).mockResolvedValue({
+    vi.mocked(parseIntentTwoStage).mockResolvedValue({
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,
@@ -76,7 +76,7 @@ describe("ArchitectureShowcase", () => {
   });
 
   it("triggers a real request from its own input, driving the same session.send pipeline as the chat panel", async () => {
-    vi.mocked(parseIntent).mockResolvedValue({
+    vi.mocked(parseIntentTwoStage).mockResolvedValue({
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,
@@ -107,7 +107,7 @@ describe("ArchitectureShowcase", () => {
   });
 
   it("offers one-click suggestions that also drive the real pipeline", async () => {
-    vi.mocked(parseIntent).mockResolvedValue({
+    vi.mocked(parseIntentTwoStage).mockResolvedValue({
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,

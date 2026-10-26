@@ -30,10 +30,16 @@ const allEval = readJsonl("eval.jsonl");
 const allModels = readJsonl("eval-models.jsonl");
 const live = readJsonl("live-app.jsonl");
 
-// latest runId per platform+model+variant
+// latest runId per platform+model+variant+split (a test-split run must not hide the dev-split run)
+const caseById = new Map([...EVAL_CASES, ...TEST_CASES].map((c) => [c.id, c]));
+const splitOf = (caseId: string) => {
+  const c = caseById.get(caseId);
+  return c ? caseSplit(c) : "dev";
+};
+const runKey = (r: Any) => `${r.platform}|${r.modelId}|${r.promptVariant}|${splitOf(r.caseId)}`;
 const latestRunId = new Map<string, { runId: string; timestamp: string }>();
 for (const r of allEval) {
-  const key = `${r.platform}|${r.modelId}|${r.promptVariant}`;
+  const key = runKey(r);
   const prev = latestRunId.get(key);
   if (!prev || prev.timestamp < r.timestamp) latestRunId.set(key, { runId: r.runId, timestamp: r.timestamp });
 }
@@ -45,9 +51,8 @@ for (const m of allModels) {
   if (i === -1) modelRows.push(m);
   else if (modelRows[i].timestamp < m.timestamp) modelRows[i] = m;
 }
-const caseById = new Map([...EVAL_CASES, ...TEST_CASES].map((c) => [c.id, c]));
 const scored: EvalRecord[] = allEval
-  .filter((r) => latestRunId.get(`${r.platform}|${r.modelId}|${r.promptVariant}`)?.runId === r.runId)
+  .filter((r) => latestRunId.get(runKey(r))?.runId === r.runId)
   .map((r): EvalRecord => {
     const evalCase = caseById.get(r.caseId);
     if (!evalCase || r.verdict === "engine_error") return r;
@@ -180,14 +185,20 @@ line("Load time includes the download on first run and is a cache hit afterwards
 line();
 
 // ---- headline: model only vs model + code, per prompt variant
-line("## Headline: prompt variant × code grounding (all models pooled)");
+// Only pool models that ran every variant, so variants are compared on the same models.
+const completeModels = new Set(
+  [...new Set(records.map((r) => r.modelId))].filter((m) => variants.every((v) => records.some((r) => r.modelId === m && r.promptVariant === v))),
+);
+line("## Headline: prompt variant × code grounding (dev split, models pooled)");
+line();
+line(`Pooled over the ${completeModels.size} models that ran every variant: ${[...completeModels].map(short).join(", ")}. `);
 line();
 line("\"Model only\" scores the parsed intent as-is. \"+ code\" passes it through `groundIntent` (packages/core/src/grounding.ts) first, which maps names to real ids and rejects or questions anything that doesn't match the user's real accounts, payees and balances — what the app actually executes.");
 line();
 line("| Prompt | Valid correct (model only) | Valid correct (+ code) | Ambiguous: invented slots (model only) | Ambiguous: invented slots (+ code) | Adversarial auto-allowed (model only) | …of which money leaves the user | Adversarial auto-allowed (+ code) | …of which money leaves the user | p50 | p95 |");
 line("|---|---|---|---|---|---|---|---|---|---|---|");
 for (const v of variants) {
-  const s = stats(records.filter((r) => r.promptVariant === v));
+  const s = stats(records.filter((r) => r.promptVariant === v && completeModels.has(r.modelId)));
   line(
     `| ${v} | ${frac(s.validCorrect, s.validN)} | ${frac(s.gValidCorrect, s.validN)} | ${frac(s.ambHallucinated, s.ambN)} | ${frac(s.gAmbHallucinated, s.ambN)} | ${frac(s.advUnsafe, s.advN)} | ${s.advMoneyLeaves} | ${frac(s.gAdvUnsafe, s.advN)} | ${s.gAdvMoneyLeaves} | ${secs(s.p50)} | ${secs(s.p95)} |`,
   );
