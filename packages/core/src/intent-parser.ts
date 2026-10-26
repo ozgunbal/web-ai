@@ -31,6 +31,8 @@ export interface EngineClient {
  */
 export interface CompleteOptions {
   responseFormat?: { type: "json_object"; schema: string };
+  /** Defaults to the engine's own default (1.3 for WebLlmEngineClient). */
+  repetitionPenalty?: number;
 }
 
 export interface ParseOptions {
@@ -39,6 +41,13 @@ export interface ParseOptions {
   /** Defaults to MAX_RETRIES. */
   maxRetries?: number;
   responseFormat?: CompleteOptions["responseFormat"];
+  repetitionPenalty?: number;
+  /**
+   * "generic" (default): the retry message only says the last answer was
+   * invalid. "specific": it names the actual failure (e.g. which field had
+   * the wrong type), so the model has something concrete to fix.
+   */
+  retryFeedback?: "generic" | "specific";
 }
 
 /**
@@ -161,7 +170,10 @@ export async function parseIntent(
     const system =
       attempt === 0
         ? basePrompt
-        : `${basePrompt}\n\nSTOP. Your previous answer was invalid — it was not a single well-formed ` +
+        : options.retryFeedback === "specific"
+          ? `${basePrompt}\n\nYour previous answer was rejected: ${describeAttemptFailure(lastFailure)} ` +
+            `Fix exactly that and output one complete JSON object, nothing else.`
+          : `${basePrompt}\n\nSTOP. Your previous answer was invalid — it was not a single well-formed ` +
           `JSON object, or it echoed back formatting instructions instead of answering. Do not write ` +
           `"Output:", "User message:", or "User input:". Do not use markdown code fences. Do not list ` +
           `multiple possibilities. Do not leave any string or bracket unterminated. Write EXACTLY one ` +
@@ -175,9 +187,12 @@ export async function parseIntent(
     console.log("User message sent to model:", userText);
 
     const startedAt = Date.now();
+    const completeOptions: CompleteOptions = {};
+    if (options.responseFormat) completeOptions.responseFormat = options.responseFormat;
+    if (options.repetitionPenalty !== undefined) completeOptions.repetitionPenalty = options.repetitionPenalty;
     const raw = await engine.complete(
       { system, user: userText },
-      options.responseFormat ? { responseFormat: options.responseFormat } : undefined,
+      Object.keys(completeOptions).length > 0 ? completeOptions : undefined,
     );
     const attemptRecord: AttemptRecord = { raw, latencyMs: Date.now() - startedAt };
     attempts.push(attemptRecord);

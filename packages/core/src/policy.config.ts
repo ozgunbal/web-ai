@@ -16,7 +16,7 @@ import type { Intent } from "./schema/intent";
 export const POLICY_RULES: PolicyRule[] = [
   {
     id: "read-only-always-allowed",
-    appliesTo: ["list_accounts", "get_transactions", "get_total_balance"],
+    appliesTo: ["list_accounts", "get_transactions", "get_total_balance", "need_clarification"],
     condition: "read-only action",
     decision: "allow",
     reason: "No state change — safe to auto-execute.",

@@ -24,4 +24,5 @@ export const INTENT_SCREEN_MAP: Record<IntentType, Screen | null> = {
   pay_known_payee: "pay",
   add_payee_and_pay: "pay",
   schedule_recurring_payment: null,
+  need_clarification: null, // answered in chat by the grounding step; never navigates
 };

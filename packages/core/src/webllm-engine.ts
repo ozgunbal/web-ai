@@ -175,7 +175,10 @@ export class WebLlmEngineClient implements EngineClient {
       // enough headroom for a verbose preamble plus a complete JSON object.
       max_tokens: 400,
       temperature: 0, // deterministic decoding for a structured-output task, not creative writing
-      repetition_penalty: 1.3, // actively discourages repeating the same token/phrase (e.g. "```json") in a loop
+      // 1.3 is the app's original setting; the eval's v3 variant measures 1.0,
+      // since a penalty on repeated tokens also penalizes the quotes and
+      // braces JSON necessarily repeats.
+      repetition_penalty: options?.repetitionPenalty ?? 1.3, // actively discourages repeating the same token/phrase (e.g. "```json") in a loop
       ...(options?.responseFormat ? { response_format: options.responseFormat } : {}),
     });
     this.lastUsage = response.usage ?? null;
