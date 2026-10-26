@@ -1,5 +1,8 @@
-import { useCallback, useState } from "react";
-import { StoreProvider } from "./mock-data/store";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { UserContext } from "@web-ai-trials/core";
+import { StoreProvider, useStore } from "./mock-data/store";
+import { SEED_ACCOUNTS } from "./mock-data/accounts";
+import { SEED_PAYEES } from "./mock-data/payees";
 import { Nav, type Screen } from "./app/Nav";
 import { AccountsScreen } from "./app/AccountsScreen";
 import { TransactionsScreen } from "./app/TransactionsScreen";
@@ -12,6 +15,20 @@ import { TourNudge } from "./tour/TourNudge";
 import { useTourNudge } from "./tour/useTourNudge";
 import { ArchitectureShowcase } from "./architecture-showcase/ArchitectureShowcase";
 
+/**
+ * The agent session lives above StoreProvider (see below), so it can't read
+ * the store directly. This sits inside the provider and keeps a ref with the
+ * current accounts/payees, so grounding checks live balances and payees the
+ * user just added.
+ */
+function UserContextBridge({ target }: { target: React.MutableRefObject<UserContext> }) {
+  const { state } = useStore();
+  useEffect(() => {
+    target.current = { accounts: state.accounts, payees: state.payees };
+  }, [state.accounts, state.payees, target]);
+  return null;
+}
+
 export function App() {
   const [screen, setScreen] = useState<Screen>("accounts");
   const [tourActive, setTourActive] = useState(false);
@@ -23,7 +40,9 @@ export function App() {
   // alongside the normal app) observes the SAME live model/session/message
   // history as the chat panel — one on-device model instance, one real
   // pipeline, two views onto it.
-  const session = useAgentSession({ onNavigate: setScreen });
+  const userContextRef = useRef<UserContext>({ accounts: SEED_ACCOUNTS, payees: SEED_PAYEES });
+  const getUserContext = useCallback(() => userContextRef.current, []);
+  const session = useAgentSession({ onNavigate: setScreen, getUserContext });
 
   const registerAgentHandle = useCallback((handle: AgentOverlayHandle) => {
     setAgentHandle(handle);
@@ -36,6 +55,7 @@ export function App() {
 
   return (
     <StoreProvider>
+      <UserContextBridge target={userContextRef} />
       <div className="shell">
         <div className="main-column">
           <div className="topbar">

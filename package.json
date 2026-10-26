@@ -5,9 +5,11 @@
   "scripts": {
     "test": "pnpm -r --filter=./packages/* test",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && pnpm --filter @web-ai-trials/core exec tsc -p ../../scripts/tsconfig.json",
     "lint": "pnpm -r lint",
-    "demo:guardrail": "pnpm --filter @web-ai-trials/core demo:guardrail"
+    "demo:guardrail": "pnpm --filter @web-ai-trials/core demo:guardrail",
+    "eval:web": "node scripts/run-eval.mjs",
+    "evidence:report": "pnpm --filter @web-ai-trials/core exec tsx ../../scripts/evidence-report.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

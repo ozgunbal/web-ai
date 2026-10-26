@@ -1,20 +1,26 @@
-#!/usr/bin/env node
 /**
  * Builds evidence/REPORT.md from the raw evidence logs:
  *   evidence/eval.jsonl         one scored record per model x prompt x case (scripts/run-eval.mjs)
  *   evidence/eval-models.jsonl  one record per model load
  *   evidence/live-app.jsonl     every parse made while using the real app
  *
- * Only the latest run per (platform, model) is used, so re-running one model
- * replaces its numbers without deleting history from the logs.
+ * Only the latest run per (platform, model, prompt variant) is used, so
+ * re-running one model or variant replaces its numbers without deleting
+ * history from the logs. Every record is RE-SCORED with the current scorer
+ * (packages/core/src/eval/scoring.ts) from its stored intent, so old and new
+ * runs are judged by the same rules, and each gets both a "model only" and a
+ * "model + code grounding" verdict.
  *
- *   node scripts/evidence-report.mjs
+ *   pnpm evidence:report
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { EVAL_CASES, scoreCase, type EvalRecord } from "../packages/core/src/eval";
 
 const DIR = resolve(import.meta.dirname, "../evidence");
-const readJsonl = (name) =>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Any = any;
+const readJsonl = (name: string): Any[] =>
   existsSync(resolve(DIR, name))
     ? readFileSync(resolve(DIR, name), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))
     : [];
@@ -23,34 +29,51 @@ const allEval = readJsonl("eval.jsonl");
 const allModels = readJsonl("eval-models.jsonl");
 const live = readJsonl("live-app.jsonl");
 
-// latest runId per platform+model
-const latestRun = new Map();
-for (const r of allModels) {
-  const key = `${r.platform}|${r.modelId}`;
-  if (!latestRun.has(key) || latestRun.get(key).timestamp < r.timestamp) latestRun.set(key, r);
+// latest runId per platform+model+variant
+const latestRunId = new Map<string, { runId: string; timestamp: string }>();
+for (const r of allEval) {
+  const key = `${r.platform}|${r.modelId}|${r.promptVariant}`;
+  const prev = latestRunId.get(key);
+  if (!prev || prev.timestamp < r.timestamp) latestRunId.set(key, { runId: r.runId, timestamp: r.timestamp });
 }
-const modelRows = [...latestRun.values()];
-const records = allEval.filter((r) => latestRun.get(`${r.platform}|${r.modelId}`)?.runId === r.runId);
+const usedRunIds = new Set([...latestRunId.values()].map((v) => v.runId));
+const modelRows: Any[] = [];
+for (const m of allModels) {
+  const i = modelRows.findIndex((x) => x.platform === m.platform && x.modelId === m.modelId);
+  if (!usedRunIds.has(m.runId)) continue;
+  if (i === -1) modelRows.push(m);
+  else if (modelRows[i].timestamp < m.timestamp) modelRows[i] = m;
+}
+const caseById = new Map(EVAL_CASES.map((c) => [c.id, c]));
+const records: EvalRecord[] = allEval
+  .filter((r) => latestRunId.get(`${r.platform}|${r.modelId}|${r.promptVariant}`)?.runId === r.runId)
+  .map((r): EvalRecord => {
+    const evalCase = caseById.get(r.caseId);
+    if (!evalCase || r.verdict === "engine_error") return r;
+    return { ...r, ...scoreCase(evalCase, { ok: r.intent != null, intent: r.intent, retriesUsed: r.retriesUsed, attempts: r.attempts }) };
+  });
 
-const short = (id) => id.replace(/-q4f16_1-MLC$/, "").replace(/-MLC$/, "");
-const pct = (n, d) => (d === 0 ? "–" : `${Math.round((100 * n) / d)}%`);
-const frac = (n, d) => `${n}/${d} (${pct(n, d)})`;
-const quantile = (xs, q) => {
+const short = (id: string) => id.replace(/-q4f16_1-MLC$/, "").replace(/-MLC$/, "");
+const pct = (n: number, d: number) => (d === 0 ? "–" : `${Math.round((100 * n) / d)}%`);
+const frac = (n: number, d: number) => `${n}/${d} (${pct(n, d)})`;
+const quantile = (xs: number[], q: number): number | null => {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b);
-  return s[Math.min(s.length - 1, Math.floor(q * s.length))];
+  return s[Math.min(s.length - 1, Math.floor(q * s.length))] ?? null;
 };
-const secs = (ms) => (ms == null ? "–" : `${(ms / 1000).toFixed(2)}s`);
-const groupBy = (xs, f) => xs.reduce((m, x) => m.set(f(x), [...(m.get(f(x)) ?? []), x]), new Map());
-const variantOrder = ["v0_field_list", "v1_examples", "v2_schema_constrained"];
+const secs = (ms: number | null | undefined) => (ms == null ? "–" : `${(ms / 1000).toFixed(2)}s`);
+const groupBy = <T, K>(xs: T[], f: (x: T) => K) =>
+  xs.reduce((m, x) => m.set(f(x), [...(m.get(f(x)) ?? []), x]), new Map<K, T[]>());
+const variantOrder = ["v0_field_list", "v1_examples", "v2_schema_constrained", "v3_grounded"];
 const models = [...new Set(records.map((r) => `${r.platform}|${r.modelId}`))];
 const variants = variantOrder.filter((v) => records.some((r) => r.promptVariant === v));
 
-function stats(rs) {
+function stats(rs: EvalRecord[]) {
   const valid = rs.filter((r) => r.category === "valid");
   const amb = rs.filter((r) => r.category === "ambiguous");
   const adv = rs.filter((r) => r.category === "adversarial");
-  const decode = rs.map((r) => r.usage?.extra?.decode_tokens_per_s).filter((x) => typeof x === "number");
+  const decode = rs.map((r) => (r.usage as Any)?.extra?.decode_tokens_per_s).filter((x): x is number => typeof x === "number");
+  const g = (cat: string) => rs.filter((r) => r.category === cat).map((r) => r.grounded);
   return {
     n: rs.length,
     validCorrect: valid.filter((r) => r.verdict === "correct").length,
@@ -61,19 +84,25 @@ function stats(rs) {
     firstTry: valid.filter((r) => r.verdict === "correct" && r.firstAttemptOk).length,
     rescued: valid.filter((r) => r.verdict === "correct" && !r.firstAttemptOk).length,
     ambHallucinated: amb.filter((r) => r.verdict === "hallucinated_slots").length,
+    ambAsked: amb.filter((r) => r.verdict === "asked_clarification").length,
     ambN: amb.length,
     advUnsafe: adv.filter((r) => r.verdict === "unsafe_auto_allowed").length,
     advGuarded: adv.filter((r) => r.verdict === "guarded").length,
     advRejected: adv.filter((r) => r.verdict === "safe_rejected").length,
     advN: adv.length,
     engineErrors: rs.filter((r) => r.verdict === "engine_error").length,
+    gValidCorrect: g("valid").filter((x) => x.verdict === "correct").length,
+    gValidRejected: g("valid").filter((x) => x.verdict === "grounding_rejected").length,
+    gAmbSafe: g("ambiguous").filter((x) => x.pass).length,
+    gAmbHallucinated: g("ambiguous").filter((x) => x.verdict === "hallucinated_slots").length,
+    gAdvUnsafe: g("adversarial").filter((x) => x.verdict === "unsafe_auto_allowed").length,
     p50: quantile(rs.map((r) => r.totalLatencyMs), 0.5),
     p95: quantile(rs.map((r) => r.totalLatencyMs), 0.95),
     decode: quantile(decode, 0.5),
   };
 }
 
-const out = [];
+const out: string[] = [];
 const line = (s = "") => out.push(s);
 
 line("# Evidence report");
@@ -98,18 +127,33 @@ line();
 line("Load time includes the download on first run and is a cache hit afterwards; compare runs before quoting it.");
 line();
 
-// ---- main matrix
-line("## Results by model and prompt variant");
+// ---- headline: model only vs model + code, per prompt variant
+line("## Headline: prompt variant × code grounding (all models pooled)");
 line();
-line("| Model | Prompt | Valid: correct | 1st try | Rescued by retry | Parse failed | Wrong intent | Wrong slots | Ambiguous: invented slots | Adversarial: auto-allowed | p50 | p95 | Decode tok/s |");
-line("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+line("\"Model only\" scores the parsed intent as-is. \"+ code\" passes it through `groundIntent` (packages/core/src/grounding.ts) first, which maps names to real ids and rejects or questions anything that doesn't match the user's real accounts, payees and balances — what the app actually executes.");
+line();
+line("| Prompt | Valid correct (model only) | Valid correct (+ code) | Ambiguous: invented slots (model only) | Ambiguous: invented slots (+ code) | Adversarial auto-allowed (model only) | Adversarial auto-allowed (+ code) | p50 | p95 |");
+line("|---|---|---|---|---|---|---|---|---|");
+for (const v of variants) {
+  const s = stats(records.filter((r) => r.promptVariant === v));
+  line(
+    `| ${v} | ${frac(s.validCorrect, s.validN)} | ${frac(s.gValidCorrect, s.validN)} | ${frac(s.ambHallucinated, s.ambN)} | ${frac(s.gAmbHallucinated, s.ambN)} | ${frac(s.advUnsafe, s.advN)} | ${frac(s.gAdvUnsafe, s.advN)} | ${secs(s.p50)} | ${secs(s.p95)} |`,
+  );
+}
+line();
+
+// ---- main matrix
+line("## Results by model and prompt variant (model only)");
+line();
+line("| Model | Prompt | Valid: correct | + code | 1st try | Rescued by retry | Parse failed | Wrong intent | Wrong slots | Ambiguous: asked | Ambiguous: invented slots | Adversarial: auto-allowed | + code | p50 | p95 | Decode tok/s |");
+line("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
 for (const key of models) {
   for (const v of variants) {
     const rs = records.filter((r) => `${r.platform}|${r.modelId}` === key && r.promptVariant === v);
     if (rs.length === 0) continue;
     const s = stats(rs);
     line(
-      `| ${short(key.split("|")[1])} | ${v} | ${frac(s.validCorrect, s.validN)} | ${s.firstTry} | ${s.rescued} | ${s.validParseFailed} | ${s.validWrongIntent} | ${s.validWrongSlots} | ${frac(s.ambHallucinated, s.ambN)} | ${frac(s.advUnsafe, s.advN)} | ${secs(s.p50)} | ${secs(s.p95)} | ${s.decode ? Math.round(s.decode) : "–"} |`,
+      `| ${short(key.split("|")[1]!)} | ${v} | ${frac(s.validCorrect, s.validN)} | ${frac(s.gValidCorrect, s.validN)} | ${s.firstTry} | ${s.rescued} | ${s.validParseFailed} | ${s.validWrongIntent} | ${s.validWrongSlots} | ${s.ambAsked} | ${frac(s.ambHallucinated, s.ambN)} | ${frac(s.advUnsafe, s.advN)} | ${s.gAdvUnsafe} | ${secs(s.p50)} | ${secs(s.p95)} | ${s.decode ? Math.round(s.decode) : "–"} |`,
     );
   }
 }
@@ -131,7 +175,7 @@ line("`clean_json` only means the text parsed as JSON; it can still fail the Int
 line();
 
 // ---- schema failures
-const issueCounts = new Map();
+const issueCounts = new Map<string, number>();
 for (const r of records)
   for (const a of r.attempts)
     for (const i of a.issues ?? []) {
@@ -160,8 +204,8 @@ if (moneyCorrect.length) {
 }
 
 // ---- assumptions
-const by = (pred) => stats(records.filter(pred));
-const small = (r) => !/2b|Phi-3\.5|mini/i.test(r.modelId);
+const by = (pred: (r: EvalRecord) => boolean) => stats(records.filter(pred));
+const small = (r: { modelId: string }) => !/2b|Phi-3\.5|mini/i.test(r.modelId);
 const a1 = models
   .filter((k) => small({ modelId: k }))
   .map((k) => ({ k, s: by((r) => `${r.platform}|${r.modelId}` === k && r.promptVariant === "v1_examples") }))
@@ -169,23 +213,27 @@ const a1 = models
 const v0 = by((r) => r.promptVariant === "v0_field_list");
 const v1 = by((r) => r.promptVariant === "v1_examples");
 const v2 = by((r) => r.promptVariant === "v2_schema_constrained");
+const v3 = by((r) => r.promptVariant === "v3_grounded");
 const all = by(() => true);
-const unsafe = records.filter((r) => r.verdict === "unsafe_auto_allowed");
+const firstUnsafe = records.find((r) => r.verdict === "unsafe_auto_allowed");
 
 line("## Assumptions vs evidence");
 line();
 line("| # | Assumption | Evidence (from this run) |");
 line("|---|---|---|");
 if (a1)
-  line(`| A1 | A ≤1.5B on-device model is good enough to parse banking intents (app prompt). | Best small model: ${short(a1.k.split("|")[1])} at ${frac(a1.s.validCorrect, a1.s.validN)} valid cases correct. |`);
+  line(`| A1 | A ≤1.5B on-device model is good enough to parse banking intents (app prompt). | Best small model: ${short(a1.k.split("|")[1]!)} at ${frac(a1.s.validCorrect, a1.s.validN)} valid cases correct. |`);
 line(`| A2 | One example per intent beats a bare field list. | Valid correct: v0 ${frac(v0.validCorrect, v0.validN)} → v1 ${frac(v1.validCorrect, v1.validN)}. |`);
 if (v2.n)
   line(`| A3 | JSON-schema constrained decoding removes format failures. | Valid parse failures: v1 ${frac(v1.validParseFailed, v1.validN)} → v2 ${frac(v2.validParseFailed, v2.validN)}. Wrong slots v1 ${v1.validWrongSlots} → v2 ${v2.validWrongSlots}. |`);
 line(`| A4 | Retries rescue bad first attempts. | ${all.rescued} of ${all.validCorrect} correct valid parses needed a retry. |`);
 line(`| A5 | The closed Intent schema rejects out-of-scope injected actions. | ${all.advRejected}/${all.advN} adversarial runs produced nothing that validated. |`);
-line(`| A6 | The guardrail stops injected money movement. | ${all.advUnsafe}/${all.advN} adversarial runs produced a transfer the guardrail would auto-execute${unsafe.length ? ` (e.g. ${short(unsafe[0].modelId)}/${unsafe[0].promptVariant} on "${unsafe[0].text}" → \`${JSON.stringify(unsafe[0].intent)}\`)` : ""}. |`);
+line(`| A6 | The guardrail stops injected money movement. | ${all.advUnsafe}/${all.advN} adversarial runs produced a transfer the guardrail would auto-execute${firstUnsafe ? ` (e.g. ${short(firstUnsafe.modelId)}/${firstUnsafe.promptVariant} on "${firstUnsafe.text}" → \`${JSON.stringify(firstUnsafe.intent)}\`)` : ""}. |`);
 line(`| A7 | Models leave missing details missing instead of inventing them. | ${frac(all.ambHallucinated, all.ambN)} ambiguous runs produced a money-moving intent with invented values. |`);
 line(`| A8 | On-device latency is interactive (<2s). | Median ${secs(all.p50)}, p95 ${secs(all.p95)} across all runs; per model in the table above. |`);
+line(`| A9 | Code-side grounding closes what the guardrail misses. | Adversarial auto-allowed: ${all.advUnsafe} model only → ${all.gAdvUnsafe} with grounding. Valid requests wrongly refused by grounding: ${all.gValidRejected}/${all.validN}. |`);
+if (v3.n)
+  line(`| A10 | Giving the model real ids, a clarify option and input→output examples (v3) beats v2. | Valid correct v2 ${frac(v2.validCorrect, v2.validN)} → v3 ${frac(v3.validCorrect, v3.validN)}; ambiguous invented slots v2 ${frac(v2.ambHallucinated, v2.ambN)} → v3 ${frac(v3.ambHallucinated, v3.ambN)}; p50 v2 ${secs(v2.p50)} → v3 ${secs(v3.p50)} (longer prompt). |`);
 line();
 
 // ---- failure gallery
@@ -195,6 +243,7 @@ line("Up to 2 examples per model × prompt × failure type, last attempt shown v
 line();
 const failures = records.filter((r) => !r.pass);
 for (const [key, rs] of groupBy(failures, (r) => `${short(r.modelId)} · ${r.promptVariant} · ${r.verdict}`)) {
+  if (!rs) continue;
   line(`### ${key} (${rs.length})`);
   line();
   for (const r of rs.slice(0, 2)) {
@@ -215,7 +264,7 @@ line();
 if (live.length === 0) {
   line("No live-app parses recorded yet (`evidence/live-app.jsonl` is written while using the app via the dev server).");
 } else {
-  const byOutcome = groupBy(live, (r) => r.outcome);
+  const byOutcome = groupBy(live, (r: Any) => r.outcome as string);
   line(`${live.length} parses recorded: ${[...byOutcome].map(([o, rs]) => `${o} ${rs.length}`).join(", ")}.`);
   line();
   line("| When | Model | Input | Outcome | Detail |");

@@ -10,6 +10,7 @@ export const IntentType = z.enum([
   "pay_known_payee", // existing, previously-used payee
   "add_payee_and_pay", // first-time payee — always high risk
   "schedule_recurring_payment",
+  "need_clarification", // the model's way to say "a required detail is missing" instead of inventing it
 ]);
 export type IntentType = z.infer<typeof IntentType>;
 
@@ -107,9 +108,19 @@ export const ScheduleRecurringPaymentIntent = baseIntent.extend({
   startDate: z.string(),
 });
 
-// Discriminated union — this is the ONLY shape the guardrail ever sees.
-// Raw user text never reaches the guardrail or the adapters.
-export const Intent = z.discriminatedUnion("type", [
+/**
+ * ADDED INTENT (v3) — without it the schema has no legal way to express
+ * "the user didn't say how much", so a model (especially under constrained
+ * decoding, which forces a schema-valid answer) has to invent an amount.
+ * Measured: see evidence/REPORT.md, ambiguous-case "invented slots".
+ */
+export const NeedClarificationIntent = baseIntent.extend({
+  type: z.literal("need_clarification"),
+  missing: z.array(z.string()).default([]),
+  question: z.string().default(""),
+});
+
+const ACTION_INTENTS = [
   ListAccountsIntent,
   GetTransactionsIntent,
   GetTotalBalanceIntent,
@@ -117,7 +128,17 @@ export const Intent = z.discriminatedUnion("type", [
   PayKnownPayeeIntent,
   AddPayeeAndPayIntent,
   ScheduleRecurringPaymentIntent,
-]);
+] as const;
+
+/**
+ * The 7 original actions only. Kept separately so the v2 eval variant's JSON
+ * schema stays exactly what was measured before need_clarification existed.
+ */
+export const ActionIntent = z.discriminatedUnion("type", [...ACTION_INTENTS]);
+
+// Discriminated union — this is the ONLY shape the guardrail ever sees.
+// Raw user text never reaches the guardrail or the adapters.
+export const Intent = z.discriminatedUnion("type", [...ACTION_INTENTS, NeedClarificationIntent]);
 export type Intent = z.infer<typeof Intent>;
 
 /**
@@ -133,6 +154,7 @@ export function riskTierForIntent(type: IntentType): RiskTier {
     case "list_accounts":
     case "get_transactions":
     case "get_total_balance":
+    case "need_clarification":
       return "read_only";
     case "transfer_internal":
     case "pay_known_payee":

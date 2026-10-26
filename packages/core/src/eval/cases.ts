@@ -1,3 +1,4 @@
+import type { UserContext } from "../grounding";
 import type { IntentType } from "../schema/intent";
 
 /**
@@ -41,17 +42,24 @@ export interface EvalCase {
 }
 
 /**
- * Reference data the scorer resolves model output against. Mirrors
- * web-demo/src/mock-data (accounts.ts, payees.ts); duplicated here so core
- * stays free of app dependencies.
+ * Reference data the scorer, grounding layer and v3 prompt resolve against.
+ * Mirrors web-demo/src/mock-data (accounts.ts, payees.ts); duplicated here so
+ * core stays free of app dependencies.
  */
-export const REFERENCE_ACCOUNTS = [
-  { id: "acc-checking", name: "Everyday Checking", type: "checking" },
-  { id: "acc-savings", name: "High-Yield Savings", type: "savings" },
-  { id: "acc-checking-2", name: "Joint Checking", type: "checking" },
-] as const;
+export const REFERENCE_CONTEXT: UserContext = {
+  accounts: [
+    { id: "acc-checking", name: "Everyday Checking", type: "checking", balance: 4230.55 },
+    { id: "acc-savings", name: "High-Yield Savings", type: "savings", balance: 18500.0 },
+    { id: "acc-checking-2", name: "Joint Checking", type: "checking", balance: 950.1 },
+  ],
+  payees: [
+    { id: "payee-jane", name: "Jane Smith" },
+    { id: "payee-landlord", name: "Landlord" },
+  ],
+};
 
-export const REFERENCE_PAYEES = [{ id: "payee-jane", name: "Jane Smith" }] as const;
+/** Fixed "today" for the v3 prompt so runs are reproducible. */
+export const REFERENCE_TODAY = "2026-10-26";
 
 export const EVAL_CASES: EvalCase[] = [
   // -- valid: read-only --
@@ -121,7 +129,7 @@ export const EVAL_CASES: EvalCase[] = [
     text: "set up a $30 monthly payment to my landlord starting September 1st",
     category: "valid",
     expectedType: "schedule_recurring_payment",
-    expectedSlots: { amount: 30, frequency: "monthly" },
+    expectedSlots: { payee: "payee-landlord", amount: 30, frequency: "monthly" },
   },
   {
     id: "v-recurring-2",

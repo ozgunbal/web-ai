@@ -4,6 +4,8 @@ import {
   AuditLog,
   parseIntent,
   classifyRawOutput,
+  groundIntent,
+  type UserContext,
   type AttemptRecord,
   WebLlmEngineClient,
   clearWebLlmCache,
@@ -16,6 +18,10 @@ import {
 import { executeIntent } from "./adapter/executeIntent";
 import { INTENT_SCREEN_MAP } from "../app/intentScreenMap";
 import type { Screen } from "../app/Nav";
+import { SEED_ACCOUNTS } from "../mock-data/accounts";
+import { SEED_PAYEES } from "../mock-data/payees";
+
+const SEED_CONTEXT: UserContext = { accounts: SEED_ACCOUNTS, payees: SEED_PAYEES };
 
 // Qwen2.5-1.5B-Instruct-q4f16_1-MLC's own reported vram_required_MB, used here
 // as a proxy for its browser Cache Storage footprint so we can warn
@@ -99,7 +105,14 @@ function summarizeAttempts(attempts: AttemptRecord[]) {
 
 export type ModelStatus = "idle" | "loading" | "ready" | "error";
 
-export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) => void } = {}) {
+export function useAgentSession({
+  onNavigate,
+  getUserContext = () => SEED_CONTEXT,
+}: {
+  onNavigate?: (screen: Screen) => void;
+  /** The user's current accounts/payees (with live balances), for grounding model output. */
+  getUserContext?: () => UserContext;
+} = {}) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [modelStatus, setModelStatus] = useState<ModelStatus>("idle");
   const [loadProgress, setLoadProgress] = useState<EngineLoadProgress | null>(null);
@@ -263,12 +276,45 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
         return;
       }
 
-      const { decision, matchedRule } = evaluateIntent(result.intent);
-      auditLogRef.current.recordParsed(text, result.intent, decision, matchedRule);
+      // Code, not the model, maps references onto real accounts/payees and
+      // checks them against real data (core/src/grounding.ts). Only a
+      // grounded intent ever reaches the guardrail.
+      const grounding = groundIntent(result.intent, getUserContext());
+      if (grounding.status !== "ok") {
+        const reason = grounding.status === "rejected" ? grounding.reason : grounding.question;
+        auditLogRef.current.recordRejected(text, `Grounding ${grounding.status}: ${reason}`);
+        logLiveParse({
+          text,
+          outcome: grounding.status === "rejected" ? "grounding_rejected" : "needs_clarification",
+          intent: result.intent,
+          reason,
+          retriesUsed: result.retriesUsed,
+          attempts: summarizeAttempts(result.attempts),
+          totalLatencyMs: elapsed(),
+        });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-${Date.now()}-a`,
+            role: "agent",
+            text: grounding.status === "rejected" ? `${reason} Nothing was executed.` : reason,
+            rejected: grounding.status === "rejected",
+            intent: result.intent,
+            rawModelOutputs: result.rawOutputs,
+            retriesUsed: result.retriesUsed,
+            elapsedMs: elapsed(),
+          },
+        ]);
+        return;
+      }
+      const intent = grounding.intent;
+
+      const { decision, matchedRule } = evaluateIntent(intent);
+      auditLogRef.current.recordParsed(text, intent, decision, matchedRule);
       logLiveParse({
         text,
         outcome: "parsed",
-        intent: result.intent,
+        intent,
         decision,
         retriesUsed: result.retriesUsed,
         attempts: summarizeAttempts(result.attempts),
@@ -282,7 +328,7 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
             id: `msg-${Date.now()}-a`,
             role: "agent",
             text: `Blocked: ${matchedRule.reason}`,
-            intent: result.intent,
+            intent: intent,
             rawModelOutputs: result.rawOutputs,
             retriesUsed: result.retriesUsed,
             decision,
@@ -300,7 +346,7 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
             id: `msg-${Date.now()}-a`,
             role: "agent",
             text: `This requires your confirmation: ${matchedRule.reason}`,
-            intent: result.intent,
+            intent: intent,
             rawModelOutputs: result.rawOutputs,
             retriesUsed: result.retriesUsed,
             decision,
@@ -313,7 +359,7 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
       }
 
       // decision === "allow"
-      const screenCheck = await ensureCorrectScreen(result.intent);
+      const screenCheck = await ensureCorrectScreen(intent);
       if (!screenCheck.ok) {
         setMessages((prev) => [
           ...prev,
@@ -321,7 +367,7 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
             id: `msg-${Date.now()}-a`,
             role: "agent",
             text: screenCheck.reason,
-            intent: result.intent,
+            intent: intent,
             rawModelOutputs: result.rawOutputs,
             retriesUsed: result.retriesUsed,
             decision,
@@ -331,7 +377,7 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
         ]);
         return;
       }
-      const execResult = executeIntent(result.intent);
+      const execResult = executeIntent(intent);
       setMessages((prev) => [
         ...prev,
         {
@@ -340,7 +386,7 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
           text: execResult.ok
             ? `Done. (${matchedRule.reason})`
             : `Approved but could not execute: ${execResult.reason}`,
-          intent: result.intent,
+          intent: intent,
           rawModelOutputs: result.rawOutputs,
           retriesUsed: result.retriesUsed,
           decision,
@@ -349,7 +395,7 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
         },
       ]);
     },
-    [ensureEngine, ensureCorrectScreen, modelStatus],
+    [ensureEngine, ensureCorrectScreen, modelStatus, getUserContext],
   );
 
   /**

@@ -41,7 +41,12 @@ export async function runEvalCase(
     const result = await parseIntent(engine, evalCase.text, variant.options);
     return {
       ...base,
-      ...scoreCase(evalCase, result),
+      ...scoreCase(evalCase, {
+        ok: result.ok,
+        intent: result.ok ? result.intent : null,
+        retriesUsed: result.retriesUsed,
+        attempts: result.attempts,
+      }),
       intent: result.ok ? result.intent : null,
       retriesUsed: result.retriesUsed,
       totalLatencyMs: Date.now() - startedAt,
@@ -57,6 +62,7 @@ export async function runEvalCase(
       guardrailDecision: null,
       firstAttemptOk: false,
       attempts: [],
+      grounded: { status: "parse_failed", verdict: "engine_error", pass: false, slotIssues: [], guardrailDecision: null },
       intent: null,
       retriesUsed: 0,
       totalLatencyMs: Date.now() - startedAt,
