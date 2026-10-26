@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { POLICY_RULES, SYSTEM_PROMPT, riskTierForIntent } from "@web-ai-trials/core/web";
+import { POLICY_RULES, riskTierForIntent } from "@web-ai-trials/core/web";
 import type { useAgentSession, AgentMessage } from "../agent-overlay/useAgentSession";
 import { PipelineDiagram, type PipelineStage } from "./PipelineDiagram";
 
@@ -24,8 +24,9 @@ const TRY_IT_SUGGESTIONS = [
  * while this page is open, instead of hiding the very execution being shown.
  *
  * Deliberately shows nothing fabricated: every value here reads from the
- * live `session` (useAgentSession) or from the real exported constants
- * (SYSTEM_PROMPT, POLICY_RULES) — there is no separate "demo data" path.
+ * live `session` (useAgentSession, including the exact parse options it
+ * sends) or from the real exported POLICY_RULES — there is no separate
+ * "demo data" path.
  */
 export function ArchitectureShowcase({
   session,
@@ -34,7 +35,8 @@ export function ArchitectureShowcase({
   session: ReturnType<typeof useAgentSession>;
   onClose: () => void;
 }) {
-  const { messages, modelStatus, send } = session;
+  const { messages, modelStatus, send, getParseOptions } = session;
+  const parseOptions = getParseOptions();
   const isReady = modelStatus === "ready";
   const [pending, setPending] = useState(false);
 
@@ -104,10 +106,13 @@ export function ArchitectureShowcase({
             <h3 className="showcase-section-title">3 · System prompt sent to the on-device LLM</h3>
             <p className="showcase-section-note">
               Sent verbatim as a <code>system</code>-role message to the local WebLLM engine on
-              every turn — this is the real constant from <code>core/src/intent-parser.ts</code>,
-              not a paraphrase.
+              every turn, built from your current accounts and payees by{" "}
+              <code>buildGroundedPrompt</code> in <code>core/src/eval/prompts.ts</code> (the measured
+              "v3" prompt).{" "}
+              {parseOptions.responseFormat &&
+                "Decoding is constrained to a JSON schema in which account and payee ids can only be your real ones."}
             </p>
-            <pre className="showcase-code-block">{SYSTEM_PROMPT}</pre>
+            <pre className="showcase-code-block">{parseOptions.systemPrompt}</pre>
           </section>
 
           <section className="showcase-section">

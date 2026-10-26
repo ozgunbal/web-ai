@@ -90,6 +90,26 @@ describe("useAgentSession — auto-navigation before execution", () => {
     expect(result.current.messages.at(-1)?.text).toBe("How much should I send?");
   });
 
+  it("sends the measured v3 options: real account ids in the prompt and a constrained-decoding schema", async () => {
+    vi.mocked(parseIntent).mockResolvedValue({
+      ok: true,
+      intent: { type: "list_accounts", rawInputSummary: "" },
+      retriesUsed: 0,
+      attempts: [],
+      rawOutputs: [],
+    });
+    const { result } = renderHook(() => useAgentSession());
+    await waitFor(() => expect(result.current.modelStatus).toBe("ready"));
+    await act(async () => {
+      await result.current.send("show accounts");
+    });
+    const options = vi.mocked(parseIntent).mock.calls[0]![2]!;
+    expect(options.systemPrompt).toContain("acc-checking: Everyday Checking");
+    expect(options.systemPrompt).toContain("payee-landlord: Landlord");
+    expect(JSON.parse(options.responseFormat!.schema).anyOf.length).toBe(8);
+    expect(options.repetitionPenalty).toBe(1.0);
+  });
+
   it("navigates to the accounts screen before executing a list_accounts intent, when currently elsewhere", async () => {
     vi.mocked(parseIntent).mockResolvedValue({
       ok: true,

@@ -5,6 +5,8 @@ import {
   parseIntent,
   classifyRawOutput,
   groundIntent,
+  groundedParseOptions,
+  type ParseOptions,
   type UserContext,
   type AttemptRecord,
   WebLlmEngineClient,
@@ -90,7 +92,14 @@ function logLiveParse(record: Record<string, unknown>): void {
   if (!import.meta.env.DEV || import.meta.env.MODE === "test") return;
   void fetch("/__evidence?stream=live-app", {
     method: "POST",
-    body: JSON.stringify({ timestamp: new Date().toISOString(), platform: "web", engine: "webllm", modelId: MODEL_ID, ...record }),
+    body: JSON.stringify({
+      timestamp: new Date().toISOString(),
+      platform: "web",
+      engine: "webllm",
+      modelId: MODEL_ID,
+      promptVariant: "v3_grounded",
+      ...record,
+    }),
   }).catch(() => undefined);
 }
 
@@ -214,6 +223,17 @@ export function useAgentSession({
     [onNavigate],
   );
 
+  /**
+   * The v3 configuration measured in evidence/REPORT.md: the user's real
+   * accounts/payees in the prompt, id enums in the constrained-decoding
+   * schema, a need_clarification option. Rebuilt per message from live store
+   * data, so a payee added mid-session is immediately a legal id.
+   */
+  const getParseOptions = useCallback(
+    (): ParseOptions => groundedParseOptions(getUserContext(), new Date().toISOString().slice(0, 10)),
+    [getUserContext],
+  );
+
   const send = useCallback(
     async (text: string) => {
       if (modelStatus !== "ready") return; // input is disabled until ready, but guard defensively
@@ -227,7 +247,7 @@ export function useAgentSession({
       const engine = ensureEngine();
       let result;
       try {
-        result = await parseIntent(engine, text);
+        result = await parseIntent(engine, text, getParseOptions());
       } catch (err) {
         setModelStatus("error");
         const message = err instanceof Error ? err.message : String(err);
@@ -395,7 +415,7 @@ export function useAgentSession({
         },
       ]);
     },
-    [ensureEngine, ensureCorrectScreen, modelStatus, getUserContext],
+    [ensureEngine, ensureCorrectScreen, modelStatus, getUserContext, getParseOptions],
   );
 
   /**
@@ -470,5 +490,6 @@ export function useAgentSession({
     modelStatus,
     loadProgress,
     auditLog: auditLogRef.current,
+    getParseOptions,
   };
 }
