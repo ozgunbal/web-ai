@@ -173,7 +173,7 @@ describe("useAgentSession — auto-navigation before execution", () => {
     await waitFor(() => expect(result.current.modelStatus).toBe("ready"));
 
     await act(async () => {
-      await result.current.send("set up a monthly payment");
+      await result.current.send("set up a monthly payment of 30 to my landlord");
     });
 
     const pendingMessage = result.current.messages.find((m) => m.pendingConfirm);

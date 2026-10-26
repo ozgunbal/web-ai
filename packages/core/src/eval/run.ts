@@ -38,7 +38,9 @@ export async function runEvalCase(
   };
   const startedAt = Date.now();
   try {
-    const result = await parseIntent(engine, evalCase.text, variant.options);
+    const result = variant.parse
+      ? await variant.parse(engine, evalCase.text)
+      : await parseIntent(engine, evalCase.text, variant.options);
     return {
       ...base,
       ...scoreCase(evalCase, {

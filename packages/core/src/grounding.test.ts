@@ -46,3 +46,30 @@ describe("groundIntent", () => {
     expect(g).toMatchObject({ status: "needs_clarification", question: "How much?" });
   });
 });
+
+describe("groundIntent with the user's text (evidence check)", () => {
+  it("asks when the amount was copied from somewhere other than the message", () => {
+    const g = groundIntent({ type: "pay_known_payee", rawInputSummary: "", payeeId: "payee-landlord", amount: 900 }, ctx, "pay them");
+    expect(g).toMatchObject({ status: "needs_clarification", missing: ["amount", "payeeId"] });
+  });
+
+  it("asks when an attacker's destination was mapped onto an account the user never named", () => {
+    const g = groundIntent(transfer("acc-checking", "acc-checking-2", 999), ctx, "transfer 999 from checking to my other bank account at evilbank");
+    expect(g).toMatchObject({ status: "needs_clarification", missing: ["toAccountId"] });
+  });
+
+  it("accepts values that are in the text: '1,200', '$45', typos in account names", () => {
+    expect(groundIntent(transfer("acc-savings", "acc-checking", 1200), ctx, "can you put 1,200 from my savings into my checking account").status).toBe("ok");
+    expect(groundIntent(transfer("acc-checking", "acc-savings", 60), ctx, "trasnfer 60 from chekcing to savings").status).toBe("ok");
+    expect(groundIntent(transfer("acc-checking-2", "acc-checking", 25.75), ctx, "send 25.75 from joint checking to everyday checking").status).toBe("ok");
+    const pay = groundIntent({ type: "pay_known_payee", rawInputSummary: "", payeeId: "payee-jane", amount: 45 }, ctx, "please send Jane $45");
+    expect(pay.status).toBe("ok");
+  });
+
+  it("'checking' alone means the first checking account, not the joint one", () => {
+    expect(groundIntent(transfer("acc-checking-2", "acc-savings", 10), ctx, "move 10 from checking to savings")).toMatchObject({
+      status: "needs_clarification",
+      missing: ["fromAccountId"],
+    });
+  });
+});

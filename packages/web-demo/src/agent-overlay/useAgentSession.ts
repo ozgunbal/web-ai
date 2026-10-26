@@ -299,7 +299,7 @@ export function useAgentSession({
       // Code, not the model, maps references onto real accounts/payees and
       // checks them against real data (core/src/grounding.ts). Only a
       // grounded intent ever reaches the guardrail.
-      const grounding = groundIntent(result.intent, getUserContext());
+      const grounding = groundIntent(result.intent, getUserContext(), text);
       if (grounding.status !== "ok") {
         const reason = grounding.status === "rejected" ? grounding.reason : grounding.question;
         auditLogRef.current.recordRejected(text, `Grounding ${grounding.status}: ${reason}`);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ActionIntent, Intent } from "../schema/intent";
-import { SYSTEM_PROMPT, type ParseOptions } from "../intent-parser";
+import { SYSTEM_PROMPT, type EngineClient, type ParseFailure, type ParseOptions, type ParseResult } from "../intent-parser";
+import { parseIntentTwoStage } from "../two-stage";
 import type { UserContext } from "../grounding";
 import { REFERENCE_CONTEXT, REFERENCE_TODAY } from "./cases";
 
@@ -118,12 +119,14 @@ User: can you pay someone for me
 Output only the JSON object.`;
 }
 
-export type PromptVariantId = "v0_field_list" | "v1_examples" | "v2_schema_constrained" | "v3_grounded";
+export type PromptVariantId = "v0_field_list" | "v1_examples" | "v2_schema_constrained" | "v3_grounded" | "v4_two_stage";
 
 export interface PromptVariant {
   id: PromptVariantId;
   label: string;
   options: ParseOptions;
+  /** Replaces the single parseIntent call (v4 makes two model calls). */
+  parse?: (engine: EngineClient, text: string) => Promise<ParseResult | ParseFailure>;
 }
 
 export const PROMPT_VARIANTS: PromptVariant[] = [
@@ -138,6 +141,12 @@ export const PROMPT_VARIANTS: PromptVariant[] = [
     id: "v3_grounded",
     label: "Real ids in prompt + id enums + clarify intent + input/output examples + penalty 1.0 + specific retry",
     options: groundedParseOptions(REFERENCE_CONTEXT, REFERENCE_TODAY),
+  },
+  {
+    id: "v4_two_stage",
+    label: "Classify the action first (enum), then extract only its fields (all optional); code decides what is missing",
+    options: {},
+    parse: (engine, text) => parseIntentTwoStage(engine, text, REFERENCE_CONTEXT, REFERENCE_TODAY),
   },
 ];
 

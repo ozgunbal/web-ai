@@ -72,7 +72,7 @@ const quantile = (xs: number[], q: number): number | null => {
 const secs = (ms: number | null | undefined) => (ms == null ? "–" : `${(ms / 1000).toFixed(2)}s`);
 const groupBy = <T, K>(xs: T[], f: (x: T) => K) =>
   xs.reduce((m, x) => m.set(f(x), [...(m.get(f(x)) ?? []), x]), new Map<K, T[]>());
-const variantOrder = ["v0_field_list", "v1_examples", "v2_schema_constrained", "v3_grounded"];
+const variantOrder = ["v0_field_list", "v1_examples", "v2_schema_constrained", "v3_grounded", "v4_two_stage"];
 const models = [...new Set(records.map((r) => `${r.platform}|${r.modelId}`))];
 const variants = variantOrder.filter((v) => records.some((r) => r.promptVariant === v));
 

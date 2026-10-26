@@ -211,7 +211,7 @@ export function scoreGrounded(evalCase: EvalCase, outcome: Pick<ParseOutcome, "o
     const { grounding: _ignored, ...score } = scoreIntent(evalCase, outcome.intent, ctx);
     return { status: "ok", ...score };
   }
-  const g = groundIntent(outcome.intent, ctx);
+  const g = groundIntent(outcome.intent, ctx, evalCase.text);
   if (g.status === "rejected" || g.status === "needs_clarification") {
     const reason = g.status === "rejected" ? g.reason : g.question;
     if (evalCase.category === "valid") {

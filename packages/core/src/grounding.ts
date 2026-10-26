@@ -82,7 +82,27 @@ function worstMatch(matches: RefMatch[]): RefMatch | null {
   return matches.includes("resolved") ? "resolved" : "exact_id";
 }
 
-export function groundIntent(intent: Intent, ctx: UserContext): GroundingOutcome {
+/**
+ * Grounds an intent against the user's data and, when `userText` is given,
+ * against the user's own words: an amount, account or payee the user never
+ * mentioned is treated as invented and turned into a question.
+ *
+ * The text check exists because of a measured failure: on ambiguous requests
+ * ("pay them", "move money") models filled the gaps by copying values from
+ * the prompt's examples (payee-landlord/900, Bob Lee/12-3456, 40), and the
+ * v3 id enum mapped attacker destinations onto the user's own accounts.
+ * Both produce values that are valid against the data but absent from the
+ * message. See docs/implementation-log/phase-9-*.md.
+ */
+export function groundIntent(intent: Intent, ctx: UserContext, userText?: string): GroundingOutcome {
+  const outcome = groundReferences(intent, ctx);
+  if (outcome.status !== "ok" || userText === undefined) return outcome;
+  const missing = unsupportedSlots(outcome.intent, userText, ctx);
+  if (missing.length === 0) return outcome;
+  return { status: "needs_clarification", intent, missing, question: questionFor(missing) };
+}
+
+function groundReferences(intent: Intent, ctx: UserContext): GroundingOutcome {
   switch (intent.type) {
     case "need_clarification":
       return {
@@ -152,4 +172,82 @@ export function groundIntent(intent: Intent, ctx: UserContext): GroundingOutcome
     default:
       return { status: "ok", intent, match: null };
   }
+}
+
+// ---- evidence in the user's own text
+
+/** Numbers as the user wrote them: "$1,200", "25.75", "120 bucks". */
+export function numbersInText(text: string): number[] {
+  return [...text.replace(/(\d),(\d{3})/g, "$1$2").matchAll(/\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+}
+
+function levenshtein(a: string, b: string): number {
+  const dp = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0]!;
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j]!;
+      dp[j] = Math.min(dp[j]! + 1, dp[j - 1]! + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return dp[b.length]!;
+}
+
+/** Same word, ignoring a plural "s", tolerating typos in longer words ("chekcing"). */
+function sameWord(a: string, b: string): boolean {
+  const x = a.replace(/s$/, "");
+  const y = b.replace(/s$/, "");
+  if (x === y) return true;
+  const len = Math.min(x.length, y.length);
+  if (len < 5) return false;
+  return levenshtein(x, y) <= (len >= 7 ? 2 : 1);
+}
+
+const textWords = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+const mentions = (text: string, word: string) => textWords(text).some((w) => sameWord(w, word));
+
+/**
+ * An account counts as mentioned if one of its distinctive name words appears
+ * ("joint", "everyday", "yield"), or its type word appears and it is the
+ * first account of that type ("checking" means Everyday Checking, not Joint).
+ */
+function accountMentioned(id: string, text: string, ctx: UserContext): boolean {
+  const account = ctx.accounts.find((a) => a.id === id);
+  if (!account) return false;
+  const type = account.type.toLowerCase();
+  const distinctive = words(account.name).filter((w) => !type.startsWith(w.replace(/s$/, "")));
+  if (distinctive.some((w) => mentions(text, w))) return true;
+  const firstOfType = ctx.accounts.find((a) => a.type.toLowerCase() === type)?.id === id;
+  return firstOfType && mentions(text, type);
+}
+
+function payeeMentioned(id: string, text: string, ctx: UserContext): boolean {
+  const payee = ctx.payees.find((p) => p.id === id);
+  return payee !== undefined && words(payee.name).some((w) => mentions(text, w));
+}
+
+/** Slots of a grounded intent whose value does not appear in the user's message. */
+export function unsupportedSlots(intent: Intent, text: string, ctx: UserContext): string[] {
+  const missing: string[] = [];
+  const fields = intent as Record<string, unknown>;
+  if (typeof fields.amount === "number" && !numbersInText(text).some((n) => Math.abs(n - (fields.amount as number)) < 0.005)) {
+    missing.push("amount");
+  }
+  for (const key of ["fromAccountId", "toAccountId"] as const) {
+    const id = fields[key];
+    if (typeof id === "string" && !accountMentioned(id, text, ctx)) missing.push(key);
+  }
+  if (typeof fields.payeeId === "string" && !payeeMentioned(fields.payeeId, text, ctx)) missing.push("payeeId");
+  if (typeof fields.payeeName === "string" && !words(fields.payeeName).some((w) => mentions(text, w))) missing.push("payeeName");
+  return missing;
+}
+
+function questionFor(missing: string[]): string {
+  const parts: string[] = [];
+  if (missing.includes("payeeId") || missing.includes("payeeName")) parts.push("who should receive it");
+  if (missing.includes("fromAccountId") || missing.includes("toAccountId")) parts.push("which of your accounts to use");
+  if (missing.includes("amount")) parts.push("how much");
+  return `Before I do anything, please tell me ${parts.join(", and ")}.`;
 }
