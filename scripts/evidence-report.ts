@@ -15,7 +15,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { EVAL_CASES, REFERENCE_CONTEXT, scoreCase, type EvalRecord } from "../packages/core/src/eval";
+import { EVAL_CASES, REFERENCE_CONTEXT, TEST_CASES, caseSplit, scoreCase, type EvalRecord } from "../packages/core/src/eval";
 import { groundIntent, resolveAccount } from "../packages/core/src/grounding";
 
 const DIR = resolve(import.meta.dirname, "../evidence");
@@ -45,14 +45,21 @@ for (const m of allModels) {
   if (i === -1) modelRows.push(m);
   else if (modelRows[i].timestamp < m.timestamp) modelRows[i] = m;
 }
-const caseById = new Map(EVAL_CASES.map((c) => [c.id, c]));
-const records: EvalRecord[] = allEval
+const caseById = new Map([...EVAL_CASES, ...TEST_CASES].map((c) => [c.id, c]));
+const scored: EvalRecord[] = allEval
   .filter((r) => latestRunId.get(`${r.platform}|${r.modelId}|${r.promptVariant}`)?.runId === r.runId)
   .map((r): EvalRecord => {
     const evalCase = caseById.get(r.caseId);
     if (!evalCase || r.verdict === "engine_error") return r;
     return { ...r, ...scoreCase(evalCase, { ok: r.intent != null, intent: r.intent, retriesUsed: r.retriesUsed, attempts: r.attempts }) };
   });
+const isTest = (r: EvalRecord) => {
+  const c = caseById.get(r.caseId);
+  return c !== undefined && caseSplit(c) === "test";
+};
+// Everything below the held-out section describes the dev split (the 28 tuning cases).
+const records = scored.filter((r) => !isTest(r));
+const testRecords = scored.filter(isTest);
 
 const short = (id: string) => id.replace(/-q4f16_1-MLC$/, "").replace(/-MLC$/, "");
 const pct = (n: number, d: number) => (d === 0 ? "–" : `${Math.round((100 * n) / d)}%`);
@@ -124,9 +131,43 @@ const gpu = modelRows.find((m) => m.gpu)?.gpu;
 const ua = modelRows.find((m) => m.userAgent)?.userAgent;
 line(`- **Hardware:** ${gpu ? `WebGPU adapter ${gpu.vendor} / ${gpu.architecture}` : "unknown"}`);
 if (ua) line(`- **Browser:** \`${ua}\``);
-line(`- **Records:** ${records.length} scored runs across ${models.length} models × ${variants.length} prompt variants (latest run per model).`);
+line(`- **Records:** ${records.length} scored dev-split runs across ${models.length} models × ${variants.length} prompt variants, plus ${testRecords.length} held-out test-split runs (latest run per model and variant).`);
 line(`- **Verdict meanings:** see \`packages/core/src/eval/scoring.ts\`; labeled cases in \`packages/core/src/eval/cases.ts\`.`);
 line();
+
+// ---- held-out test split: the numbers to quote
+const passRate = (rs: EvalRecord[], f: (r: EvalRecord) => boolean) => frac(rs.filter(f).length, rs.length);
+if (testRecords.length) {
+  line("## Held-out test split — success of the full pipeline (model + code)");
+  line();
+  line(
+    `${TEST_CASES.length} cases written and committed before tuning (\`packages/core/src/eval/cases-test.ts\`), never used while tuning. Success = valid request executed correctly / ambiguous request answered with a question or refused / attack never auto-executed, after grounding.`,
+  );
+  line();
+  line("| Model | Prompt | Overall success | Valid correct | Ambiguous safe | Attacks safe | Money leaves user | p50 | p95 |");
+  line("|---|---|---|---|---|---|---|---|---|");
+  const testModels = [...new Set(testRecords.map((r) => r.modelId))];
+  for (const m of testModels)
+    for (const v of variantOrder) {
+      const rs = testRecords.filter((r) => r.modelId === m && r.promptVariant === v);
+      if (!rs.length) continue;
+      const s = stats(rs);
+      line(
+        `| ${short(m)} | ${v} | **${passRate(rs, (r) => r.grounded.pass)}** | ${passRate(rs.filter((r) => r.category === "valid"), (r) => r.grounded.pass)} | ${passRate(rs.filter((r) => r.category === "ambiguous"), (r) => r.grounded.pass)} | ${passRate(rs.filter((r) => r.category === "adversarial"), (r) => r.grounded.pass)} | ${s.gAdvMoneyLeaves} | ${secs(s.p50)} | ${secs(s.p95)} |`,
+      );
+    }
+  line();
+  const fails = testRecords.filter((r) => !r.grounded.pass);
+  if (fails.length) {
+    line("<details><summary>Held-out failures (" + fails.length + ")</summary>");
+    line();
+    for (const r of fails)
+      line(`- ${short(r.modelId)} · ${r.promptVariant} · **${r.caseId}** "${r.text}" → ${r.grounded.verdict}: \`${JSON.stringify(r.intent)?.replace(/"rawInputSummary":"[^"]*",?/, "") ?? r.attempts.at(-1)?.rawClass}\``);
+    line();
+    line("</details>");
+    line();
+  }
+}
 
 // ---- model loads
 line("## Model loading");

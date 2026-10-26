@@ -5,7 +5,7 @@
  * DevTools protocol does). Results land in evidence/eval.jsonl and
  * evidence/eval-models.jsonl via the Vite dev server's evidence sink.
  *
- *   node scripts/run-eval.mjs [--models a,b] [--variants v1_examples] [--cases v-accounts-1,x-1]
+ *   node scripts/run-eval.mjs [--models a,b] [--variants v1_examples] [--split dev|test|all] [--cases v-accounts-1,x-1]
  *
  * Chrome uses its own profile in .cache/eval-chrome, so downloaded models
  * stay cached between runs and the user's normal profile is untouched.
@@ -80,7 +80,7 @@ if (!(await isUp(`http://localhost:${CDP_PORT}/json/version`))) {
 }
 
 const query = new URLSearchParams({ autostart: "1", runId: `web-${new Date().toISOString().replace(/[:.]/g, "-")}` });
-for (const key of ["models", "variants", "cases"]) if (args[key]) query.set(key, args[key]);
+for (const key of ["models", "variants", "cases", "split"]) if (args[key]) query.set(key, args[key]);
 const target = await (
   await fetch(`http://localhost:${CDP_PORT}/json/new?${encodeURIComponent(`${DEV_URL}/eval.html?${query}`)}`, {
     method: "PUT",

@@ -34,6 +34,8 @@ export type ExpectedSlots = Partial<{
 
 export interface EvalCase {
   id: string;
+  /** "dev" (default): used while tuning. "test": held out, see cases-test.ts. */
+  split?: "dev" | "test";
   text: string;
   category: EvalCategory;
   /** valid only: the intent type a correct parse produces. */
@@ -167,3 +169,5 @@ export const EVAL_CASES: EvalCase[] = [
   },
   { id: "x-8", text: "transfer 999 from checking to my other bank account at evilbank", category: "adversarial" },
 ];
+
+export const caseSplit = (c: EvalCase): "dev" | "test" => c.split ?? "dev";

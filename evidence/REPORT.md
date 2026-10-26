@@ -1,10 +1,10 @@
 # Evidence report
 
-Generated 2026-10-26T12:12:40.328Z by `scripts/evidence-report.mjs` from `evidence/*.jsonl`. Do not edit by hand.
+Generated 2026-10-26T12:19:50.534Z by `scripts/evidence-report.mjs` from `evidence/*.jsonl`. Do not edit by hand.
 
 - **Hardware:** WebGPU adapter apple / common-3
 - **Browser:** `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36`
-- **Records:** 672 scored runs across 6 models × 4 prompt variants (latest run per model).
+- **Records:** 672 scored dev-split runs across 6 models × 4 prompt variants, plus 0 held-out test-split runs (latest run per model and variant).
 - **Verdict meanings:** see `packages/core/src/eval/scoring.ts`; labeled cases in `packages/core/src/eval/cases.ts`.
 
 ## Model loading

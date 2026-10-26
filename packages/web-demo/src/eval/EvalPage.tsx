@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   EVAL_CASES,
+  TEST_CASES,
   PROMPT_VARIANTS,
   runEvalCase,
   WebLlmEngineClient,
@@ -14,14 +15,13 @@ import {
  * evidence/eval.jsonl. Driven by query params so scripts/run-eval.mjs can run
  * it unattended:
  *
- *   /eval.html?models=a,b&variants=v1_examples&cases=v-accounts-1&autostart=1
+ *   /eval.html?models=a,b&variants=v1_examples&split=test&cases=t-v-01&autostart=1
  *
  * Progress is mirrored on `window.__evalStatus` for the runner to poll.
  */
 
 export const DEFAULT_MODELS = [
   "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
-  "gemma3-1b-it-q4f16_1-MLC",
   "Llama-3.2-1B-Instruct-q4f16_1-MLC",
   "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
   "gemma-2-2b-it-q4f16_1-MLC",
@@ -64,7 +64,10 @@ export function EvalPage() {
   const variantIds = listParam(params, "variants");
   const caseIds = listParam(params, "cases");
   const variants = variantIds ? PROMPT_VARIANTS.filter((v) => variantIds.includes(v.id)) : PROMPT_VARIANTS;
-  const cases = caseIds ? EVAL_CASES.filter((c) => caseIds.includes(c.id)) : EVAL_CASES;
+  // split=dev (default, the 28 tuning cases) | test (held-out) | all
+  const split = params.get("split") ?? "dev";
+  const pool = split === "test" ? TEST_CASES : split === "all" ? [...EVAL_CASES, ...TEST_CASES] : EVAL_CASES;
+  const cases = caseIds ? pool.filter((c) => caseIds.includes(c.id)) : pool;
   const total = models.length * variants.length * cases.length;
 
   const [status, setStatus] = useState<EvalStatus>({ state: "idle", runId: "", done: 0, total, current: "", errors: [] });
