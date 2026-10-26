@@ -1,0 +1,682 @@
+<title>On-Device LLM Postmortem</title>
+
+<style>
+  :root {
+    --paper: #f7f5f0;
+    --ink: #1c1a17;
+    --ink-soft: #3a352d;
+    --muted: #6b6459;
+    --hairline: #ded8ca;
+    --surface: #efece3;
+    --code-bg: #ece7db;
+    --red: #b8432f;
+    --red-soft: #f3e2dd;
+    --green: #3f6b4c;
+    --green-soft: #e2ead9;
+    --amber: #a8681f;
+    --amber-soft: #f2e3cd;
+    --shadow: 0 1px 2px rgba(28, 26, 23, 0.06), 0 4px 16px rgba(28, 26, 23, 0.05);
+  }
+
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --paper: #181613;
+      --ink: #ece7dc;
+      --ink-soft: #cfc9bc;
+      --muted: #948c7d;
+      --hairline: #34302a;
+      --surface: #221f1a;
+      --code-bg: #1e1c18;
+      --red: #e07a63;
+      --red-soft: #3a2420;
+      --green: #7fb890;
+      --green-soft: #1e2e21;
+      --amber: #d99c4c;
+      --amber-soft: #362917;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #181613;
+    --ink: #ece7dc;
+    --ink-soft: #cfc9bc;
+    --muted: #948c7d;
+    --hairline: #34302a;
+    --surface: #221f1a;
+    --code-bg: #1e1c18;
+    --red: #e07a63;
+    --red-soft: #3a2420;
+    --green: #7fb890;
+    --green-soft: #1e2e21;
+    --amber: #d99c4c;
+    --amber-soft: #362917;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 5rem 1.5rem 8rem;
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 3rem 1.25rem 5rem; }
+  }
+
+  h1, h2, h3, .display {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+
+  /* ---------- Masthead ---------- */
+
+  .masthead {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 2.25rem;
+    margin-bottom: 3rem;
+  }
+
+  .kicker {
+    display: flex;
+    align-items: center;
+    gap: 0.65em;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1.1rem;
+  }
+
+  .kicker .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--red);
+    flex-shrink: 0;
+  }
+
+  h1.title {
+    font-size: clamp(2.1rem, 5vw, 2.9rem);
+    line-height: 1.08;
+    margin: 0 0 0.85rem;
+    letter-spacing: -0.01em;
+    font-optical-sizing: auto;
+    font-variation-settings: "opsz" 40, "SOFT" 40;
+  }
+
+  .dek {
+    font-size: 1.12rem;
+    color: var(--ink-soft);
+    max-width: 60ch;
+    margin: 0 0 1.6rem;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.6rem;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .meta-row strong {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  /* ---------- Section headers ---------- */
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.9rem;
+    margin: 3.4rem 0 1.4rem;
+  }
+
+  .section-head h2 {
+    font-size: 1.5rem;
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+
+  .section-head .rule {
+    flex: 1;
+    height: 1px;
+    background: var(--hairline);
+    transform: translateY(-0.35em);
+  }
+
+  .lede {
+    color: var(--ink-soft);
+    font-size: 1.02rem;
+    max-width: 62ch;
+    margin: 0 0 2rem;
+  }
+
+  /* ---------- Incident log ---------- */
+
+  .log {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .incident {
+    position: relative;
+    padding: 2rem 0 2rem 3.4rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .incident::before {
+    content: attr(data-n);
+    position: absolute;
+    left: 0;
+    top: 2.1rem;
+    width: 2.5rem;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .incident h3 {
+    font-size: 1.2rem;
+    margin: 0 0 0.5rem;
+    line-height: 1.35;
+    letter-spacing: -0.005em;
+  }
+
+  .incident .symptom-label {
+    display: inline-block;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .raw {
+    background: var(--code-bg);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    padding: 0.85rem 1rem;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0.9rem 0 1.1rem;
+  }
+
+  .raw .fade {
+    color: var(--muted);
+  }
+
+  .diagnosis {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.35rem 0.8rem;
+    font-size: 0.94rem;
+    margin-top: 1rem;
+  }
+
+  .diagnosis dt {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 0.2rem;
+    white-space: nowrap;
+  }
+
+  .diagnosis dd {
+    margin: 0;
+    color: var(--ink-soft);
+  }
+
+  .diagnosis dd.fix {
+    color: var(--ink);
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.2em 0.6em;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+
+  .tag.model  { background: var(--red-soft);   color: var(--red); }
+  .tag.infra  { background: var(--amber-soft); color: var(--amber); }
+  .tag.app    { background: var(--green-soft); color: var(--green); }
+
+  .pivot {
+    background: var(--amber-soft);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--hairline));
+    border-radius: 6px;
+    padding: 1.3rem 1.5rem;
+    margin: 2.6rem 0;
+  }
+
+  .pivot .kicker { color: var(--amber); margin-bottom: 0.6rem; }
+  .pivot .kicker .dot { background: var(--amber); }
+  .pivot p { margin: 0.4rem 0 0; color: var(--ink-soft); }
+  .pivot p:first-of-type { margin-top: 0.8rem; }
+
+  /* ---------- Lessons ---------- */
+
+  .lessons {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+  }
+
+  .lesson {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.4rem;
+    padding-bottom: 1.6rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .lesson:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .lesson h3 {
+    font-size: 1.08rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.55em;
+  }
+
+  .lesson h3 .num {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    color: var(--amber);
+    font-size: 0.85em;
+  }
+
+  .lesson p {
+    margin: 0;
+    color: var(--ink-soft);
+    max-width: 64ch;
+  }
+
+  /* ---------- Table (final state) ---------- */
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    margin: 1rem 0 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--hairline);
+    white-space: nowrap;
+  }
+
+  th {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface);
+    font-weight: 600;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td.num { font-variant-numeric: tabular-nums; font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+  /* ---------- Closing ---------- */
+
+  .closing {
+    margin-top: 3.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--hairline);
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .closing strong { color: var(--ink-soft); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .incident, .lesson { transition: none; }
+  }
+</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,500;9..144,600;9..144,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="kicker"><span class="dot"></span> Postmortem &middot; on-device agent build</div>
+    <h1 class="title">Getting a 1.5B-parameter model to speak JSON</h1>
+    <p class="dek">
+      Ten rounds of debugging a browser-side LLM intent parser — from a silent config bug
+      buried in a model's own release, through a runtime that fought its own documentation,
+      to a model that quoted our instructions back at us instead of answering them.
+    </p>
+    <div class="meta-row">
+      <span><strong>Stack:</strong> WebLLM 0.2.84 · WebGPU · zod</span>
+      <span><strong>Models tried:</strong> gemma-2-2b-it → gemma3-1b-it → Qwen2.5-1.5B-Instruct</span>
+      <span><strong>Fixes shipped:</strong> 10</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>The setup, in one sentence</h2>
+      <div class="rule"></div>
+    </div>
+    <p class="lede">
+      A React demo app runs an LLM entirely in the visitor's browser via WebGPU, asks it to turn
+      a typed sentence ("transfer $200 to savings") into one JSON object matching a fixed schema,
+      and only then lets a deterministic policy engine decide whether to act on it. No server,
+      no API key — which also means no server logs, no stack traces from a vendor's backend,
+      and no one else's postmortem to read when it breaks. Everything below was diagnosed from
+      inside the browser tab.
+    </p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>The incident log</h2>
+      <div class="rule"></div>
+    </div>
+    <p class="lede">
+      In the order they actually happened. Each one looked, at first glance, like the same
+      complaint — "the model won't give me JSON" — and each one turned out to be a genuinely
+      different layer of the stack.
+    </p>
+
+    <div class="log">
+
+      <article class="incident" data-n="01">
+        <span class="tag infra">infra</span>
+        <span class="symptom-label">Symptom — download succeeds, browser throws anyway</span>
+        <h3>Cache.add() encountered a network error</h3>
+        <div class="raw">BindingError / NetworkError: Failed to execute 'add' on 'Cache':<br>Cache.add() encountered a network error</div>
+        <dl class="diagnosis">
+          <dt>Root cause</dt>
+          <dd>The presentation machine had ~2.8&nbsp;GB of free disk left. Chrome's Cache Storage quota
+            is a function of free disk space, and the 1.9&nbsp;GB Gemma-2B model download was tripping
+            that ceiling mid-write. Confirmed with <code>df -h</code>, not guessed.</dd>
+          <dt>Fix</dt>
+          <dd class="fix">Downgraded to a 711&nbsp;MB model and added a proactive
+            <code>navigator.storage.estimate()</code> check that warns <em>before</em> a doomed
+            multi-minute download starts.</dd>
+        </dl>
+      </article>
+
+      <article class="incident" data-n="02">
+        <span class="tag model">model config</span>
+        <span class="symptom-label">Symptom — model loads, then refuses to construct</span>
+        <h3>Two settings the model itself shipped in conflict</h3>
+        <div class="raw">WindowSizeConfigurationError: Only one of context_window_size and<br>sliding_window_size can be positive. Got: context_window_size: 4096,<br>sliding_window_size: 512</div>
+        <dl class="diagnosis">
+          <dt>Root cause</dt>
+          <dd>Fetched the model's own <code>mlc-chat-config.json</code> straight from Hugging Face:
+            it ships with both fields positive. WebLLM's own prebuilt model record for it only
+            overrides one of the two — a real gap in the vendor's shipped defaults.</dd>
+          <dt>Fix</dt>
+          <dd class="fix">Passed <code>{ sliding_window_size: -1 }</code> as a per-call override,
+            exactly as the error message itself suggested.</dd>
+        </dl>
+      </article>
+
+      <article class="incident" data-n="03">
+        <span class="tag infra">infra</span>
+        <span class="symptom-label">Symptom — crashes the instant a real message is sent</span>
+        <h3>A documented feature that doesn't do what its docs say</h3>
+        <div class="raw">BindingError: Cannot pass non-string to std::string<br><span class="fade">at GrammarCompiler.CompileJSONSchema</span></div>
+        <dl class="diagnosis">
+          <dt>Root cause</dt>
+          <dd>WebLLM's <code>response_format: &#123; type: "json_object" &#125;</code> is documented as
+            "guarantees valid JSON" — but its runtime unconditionally compiles a JSON-schema grammar
+            from a <code>schema</code> string we'd never supplied. Traced to the exact call site in
+            WebLLM's own source, not assumed.</dd>
+          <dt>Fix</dt>
+          <dd class="fix">Dropped <code>response_format</code> entirely. Structural validation moved
+            fully onto our own zod parse-and-reject loop — which, per the original design, was always
+            meant to be the real security boundary anyway.</dd>
+        </dl>
+      </article>
+
+      <article class="incident" data-n="04">
+        <span class="tag model">model behavior</span>
+        <span class="symptom-label">Symptom — technically valid, functionally useless</span>
+        <h3>A model that won't stop talking</h3>
+        <div class="raw">```json<br>```json<br>```json<br>```json<span class="fade"> …repeated for the full token budget</span></div>
+        <dl class="diagnosis">
+          <dt>Root cause</dt>
+          <dd>With grammar-constrained decoding gone (fix&nbsp;03), nothing was stopping the model
+            from degenerating into a repetition loop — a known small-model failure mode with no
+            sampling constraints.</dd>
+          <dt>Fix</dt>
+          <dd class="fix"><code>max_tokens: 200</code>, <code>temperature: 0</code>,
+            <code>repetition_penalty: 1.3</code> — plus truncating anything logged past 2,000 chars
+            so a degenerate reply couldn't also flood devtools.</dd>
+        </dl>
+      </article>
+
+      <article class="incident" data-n="05">
+        <span class="tag app">our bug</span>
+        <span class="symptom-label">Symptom — failures with zero diagnostic trail</span>
+        <h3>The one thing that actually explains a failure was never kept</h3>
+        <p style="color:var(--ink-soft); margin: 0 0 0.9rem; font-size:0.94rem;">
+          Every rejected parse only ever produced the same sentence: <em>"Model output did not
+          validate against the Intent schema after retries."</em> Zod's own <code>error.issues</code>
+          — the exact field, the exact type mismatch — was computed on every attempt and discarded
+          on every attempt.
+        </p>
+        <dl class="diagnosis">
+          <dt>Fix</dt>
+          <dd class="fix">Grouped console logging for every attempt (prompt, raw output, extraction
+            result, validation issues), <em>and</em> promoted the real issue detail into the
+            user-facing failure reason instead of a generic string.</dd>
+        </dl>
+      </article>
+
+      <article class="incident" data-n="06">
+        <span class="tag model">model behavior</span>
+        <span class="symptom-label">Symptom — plausible-looking JSON, wrong on every field</span>
+        <h3>Reasonable output the schema was too rigid to accept</h3>
+        <p style="color:var(--ink-soft); margin: 0 0 0.9rem; font-size:0.94rem;">
+          With real diagnostics finally in place, the next failures turned out to be cosmetic:
+          <code>"amount": "200"</code> as a string, and a dropped <code>rawInputSummary</code> field
+          the model wasn't treating as essential.
+        </p>
+        <dl class="diagnosis">
+          <dt>Fix</dt>
+          <dd class="fix"><code>z.coerce.number()</code> for amounts, <code>.default("")</code> for
+            the summary field — deliberately <em>not</em> touching the closed action-type enum or any
+            required transfer field, which stayed exactly as strict.</dd>
+        </dl>
+      </article>
+
+      <article class="incident" data-n="07">
+        <span class="tag model">model behavior</span>
+        <span class="symptom-label">Symptom — output degrades from "wrong" to "not JSON at all"</span>
+        <h3>An unfinished thought, cut off mid-object</h3>
+        <div class="raw">```json<br>&#123;<br>"Account1234567890, 100.01<span class="fade"> — never closes</span></div>
+        <dl class="diagnosis">
+          <dt>Root cause</dt>
+          <dd>A verbose model front-loading prose before the real answer, hitting the 200-token
+            ceiling from fix&nbsp;04 before it ever reached a closing brace.</dd>
+          <dt>Fix</dt>
+          <dd class="fix">Raised the ceiling to 400 tokens, added one concrete example JSON object
+            per action type to the prompt, and made <code>extractJson()</code> try every fenced code
+            block in a reply, not just the first.</dd>
+        </dl>
+      </article>
+
+      <article class="incident" data-n="08">
+        <span class="tag model">model behavior</span>
+        <span class="symptom-label">Symptom — the model quotes the prompt back instead of answering it</span>
+        <h3>It learned our formatting, not our task</h3>
+        <div class="raw">User message:<br>User input: show me my accounts.<br>User: show me accounts<span class="fade"><br>…repeated with small variations, for hundreds of lines</span></div>
+        <dl class="diagnosis">
+          <dt>Root cause</dt>
+          <dd>The literal string <code>"User message: &#123;text&#125;"</code> was being folded into
+            one <code>user</code>-role turn. With no real system role in play, the model had no signal
+            that "User message:" was our formatting convention rather than content worth
+            imitating — so it imitated it.</dd>
+          <dt>Fix</dt>
+          <dd class="fix">Sent instructions and the visitor's actual words as two genuinely separate
+            chat messages — <code>system</code>, then <code>user</code> — with zero hand-rolled labels
+            in either.</dd>
+        </dl>
+      </article>
+
+    </div>
+
+    <div class="pivot">
+      <div class="kicker"><span class="dot"></span> The pivot</div>
+      <p><strong>Round nine came back worse, not better.</strong> Same category of failure as
+        round eight, after a fix aimed squarely at that category. That's the signal that a
+        problem has stopped being a bug and started being a ceiling: a 1-billion-parameter,
+        heavily quantized model asked to hold a schema, a retry correction, and a user request
+        in mind at once — and reliably lose track of which one it was supposed to be doing.</p>
+      <p>The fix wasn't a fix. It was <strong>Qwen2.5-1.5B-Instruct</strong> — roughly double
+        the parameters, a chat template with a real system-role turn instead of role-folding,
+        and a config that already shipped the window-size setting from incident&nbsp;02 correctly.
+        Free disk space had also grown to 7.9&nbsp;GB by this point, removing the original
+        constraint that picked the smaller model in the first place.</p>
+    </div>
+
+    <article class="incident" data-n="10">
+      <span class="tag app">our bug</span>
+      <span class="symptom-label">Symptom — correct answer, "broken" outcome</span>
+      <h3>The model was finally right. The app wasn't looking.</h3>
+      <div class="raw">✓ allowed &middot; list_accounts &middot; &#123;"type":"list_accounts", "rawInputSummary":""&#125;<br>Approved but could not execute: No [data-agent-action="list_accounts"]<br>element found on current screen.</div>
+      <dl class="diagnosis">
+        <dt>Root cause</dt>
+        <dd>The demo only mounts one screen's DOM at a time. The model parsed the request
+          correctly and the policy engine approved it correctly — the visitor was simply looking
+          at a different screen than the one the action lived on.</dd>
+        <dt>Fix</dt>
+        <dd class="fix">An intent&rarr;screen map, consulted before execution: the agent now
+          switches screens itself, waits a frame for React to mount it, <em>then</em> acts —
+          the same principle a human assistant follows without being told.</dd>
+      </dl>
+    </article>
+
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>What carries over</h2>
+      <div class="rule"></div>
+    </div>
+    <p class="lede">
+      Five things worth saying out loud to anyone else about to put a small model in front
+      of real users.
+    </p>
+    <div class="lessons">
+
+      <div class="lesson">
+        <h3><span class="num">01</span> A vendor's docs describe the intent, not always the runtime.</h3>
+        <p>Twice — the window-size conflict, the response-format crash — the fix came from
+          reading WebLLM's actual source at the exact call site, not from its documentation.
+          Both bugs were shipped in a widely-used library, not exotic edge cases.</p>
+      </div>
+
+      <div class="lesson">
+        <h3><span class="num">02</span> Every rejection needs to carry its own reason forward.</h3>
+        <p>The single highest-leverage change in this whole log was incident&nbsp;05, and it was
+          purely diagnostic: keep the data a validator already computes, instead of collapsing it
+          into one static sentence. Every fix after it got faster because of it.</p>
+      </div>
+
+      <div class="lesson">
+        <h3><span class="num">03</span> A model imitates the shape of what it's shown, not just its content.</h3>
+        <p>Incident&nbsp;08 wasn't a prompting problem in the "try different words" sense — it was
+          a structural one. Labels meant for a human reader ("User message:") read as formatting
+          instructions to a model with no other way to tell instruction from content apart.</p>
+      </div>
+
+      <div class="lesson">
+        <h3><span class="num">04</span> Getting worse after a targeted fix is itself the answer.</h3>
+        <p>Nine straight rounds of narrowing, sharper, more targeted fixes — and round nine came
+          back with the same failure family, undiminished. That pattern is the signal to change
+          what's being fixed, not how hard.</p>
+      </div>
+
+      <div class="lesson">
+        <h3><span class="num">05</span> "The model answered correctly" and "the task succeeded" are different claims.</h3>
+        <p>The very last bug wasn't a model problem at all. Once the intent layer was solid, the
+          next failure was waiting in the application layer that assumed the model would only ever
+          be asked about whatever was already on screen.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Where it landed</h2>
+      <div class="rule"></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Start of build</th><th>End of build</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Model</td><td>gemma-2-2b-it</td><td>Qwen2.5-1.5B-Instruct</td></tr>
+          <tr><td>response_format</td><td>json_object (broken)</td><td>none — zod is the boundary</td></tr>
+          <tr><td>Prompt roles</td><td>one concatenated string</td><td>real system / user turns</td></tr>
+          <tr><td>Failure reason shown</td><td>one static sentence</td><td>the actual field &amp; cause</td></tr>
+          <tr><td>Screen awareness</td><td>none</td><td>auto-navigates before acting</td></tr>
+          <tr><td class="num">Automated tests</td><td class="num">0</td><td class="num">97, all green</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="closing">
+    Every fix above was verified against a real, reproduced failure before being called done —
+    the harder discipline than fixing was resisting the urge to call something fixed on theory
+    alone. <strong>Ten rounds, one honest pivot, zero shortcuts.</strong>
+  </div>
+
+</div>
