@@ -48,6 +48,7 @@ describe("useAgentSession — auto-navigation before execution", () => {
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,
+      attempts: [],
       rawOutputs: [],
     });
 
@@ -97,6 +98,7 @@ describe("useAgentSession — auto-navigation before execution", () => {
         startDate: "2026-09-01",
       },
       retriesUsed: 0,
+      attempts: [],
       rawOutputs: [],
     });
 
@@ -138,6 +140,7 @@ describe("useAgentSession — auto-navigation before execution", () => {
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,
+      attempts: [],
       rawOutputs: [],
     });
     setDom(`<section data-agent-action="list_accounts"></section>`);

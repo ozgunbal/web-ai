@@ -61,7 +61,7 @@ describe("WebLlmEngineClient — console logging on load failure", () => {
       CreateMLCEngine: vi.fn().mockRejectedValue(initError),
     }));
 
-    const { WebLlmEngineClient } = await import("./intent-parser");
+    const { WebLlmEngineClient } = await import("./webllm-engine");
     const client = new WebLlmEngineClient("some-model-id");
 
     const thrown = await awaitRejectionWithFakeTimers(client.preload());
@@ -89,7 +89,7 @@ describe("WebLlmEngineClient — console logging on load failure", () => {
       CreateMLCEngine: vi.fn().mockRejectedValue(initError),
     }));
 
-    const { WebLlmEngineClient } = await import("./intent-parser");
+    const { WebLlmEngineClient } = await import("./webllm-engine");
     const client = new WebLlmEngineClient("some-model-id");
 
     const thrown = await awaitRejectionWithFakeTimers(client.preload());
@@ -112,7 +112,7 @@ describe("WebLlmEngineClient — console logging on load failure", () => {
       CreateMLCEngine: vi.fn().mockRejectedValue(configError),
     }));
 
-    const { WebLlmEngineClient } = await import("./intent-parser");
+    const { WebLlmEngineClient } = await import("./webllm-engine");
     const client = new WebLlmEngineClient("some-model-id");
 
     const thrown = await awaitRejectionWithFakeTimers(client.preload());
@@ -128,7 +128,7 @@ describe("WebLlmEngineClient — console logging on load failure", () => {
       CreateMLCEngine: vi.fn().mockRejectedValue(cacheError),
     }));
 
-    const { WebLlmEngineClient } = await import("./intent-parser");
+    const { WebLlmEngineClient } = await import("./webllm-engine");
     const client = new WebLlmEngineClient("some-model-id");
 
     const thrown = await awaitRejectionWithFakeTimers(client.preload());
@@ -149,7 +149,7 @@ describe("WebLlmEngineClient — console logging on load failure", () => {
       }),
     }));
 
-    const { WebLlmEngineClient } = await import("./intent-parser");
+    const { WebLlmEngineClient } = await import("./webllm-engine");
     const client = new WebLlmEngineClient("some-model-id");
 
     await awaitRejectionWithFakeTimers(client.preload());
@@ -181,7 +181,7 @@ describe("WebLlmEngineClient — sliding_window_size override", () => {
     const createMLCEngine = vi.fn().mockResolvedValue({ chat: { completions: { create: vi.fn() } } });
     vi.doMock("@mlc-ai/web-llm", () => ({ CreateMLCEngine: createMLCEngine }));
 
-    const { WebLlmEngineClient } = await import("./intent-parser");
+    const { WebLlmEngineClient } = await import("./webllm-engine");
     const client = new WebLlmEngineClient("gemma3-1b-it-q4f16_1-MLC");
     await client.preload();
 
@@ -216,7 +216,7 @@ describe("WebLlmEngineClient.complete — response_format", () => {
       CreateMLCEngine: vi.fn().mockResolvedValue({ chat: { completions: { create } } }),
     }));
 
-    const { WebLlmEngineClient } = await import("./intent-parser");
+    const { WebLlmEngineClient } = await import("./webllm-engine");
     const client = new WebLlmEngineClient("gemma3-1b-it-q4f16_1-MLC");
     await client.complete({ system: "some system prompt", user: "some user message" });
 
@@ -235,7 +235,7 @@ describe("WebLlmEngineClient.complete — response_format", () => {
       CreateMLCEngine: vi.fn().mockResolvedValue({ chat: { completions: { create } } }),
     }));
 
-    const { WebLlmEngineClient } = await import("./intent-parser");
+    const { WebLlmEngineClient } = await import("./webllm-engine");
     const client = new WebLlmEngineClient("gemma3-1b-it-q4f16_1-MLC");
     await client.complete({ system: "some system prompt", user: "some user message" });
 
@@ -258,7 +258,7 @@ describe("WebLlmEngineClient.complete — response_format", () => {
       CreateMLCEngine: vi.fn().mockResolvedValue({ chat: { completions: { create } } }),
     }));
 
-    const { WebLlmEngineClient } = await import("./intent-parser");
+    const { WebLlmEngineClient } = await import("./webllm-engine");
     const client = new WebLlmEngineClient("gemma3-1b-it-q4f16_1-MLC");
     await client.complete({ system: "instructions go here", user: "show me my accounts" });
 

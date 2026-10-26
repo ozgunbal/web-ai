@@ -53,6 +53,7 @@ describe("ArchitectureShowcase", () => {
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,
+      attempts: [{ raw: '{"type":"list_accounts","rawInputSummary":"show accounts"}', latencyMs: 1 }],
       rawOutputs: ['{"type":"list_accounts","rawInputSummary":"show accounts"}'],
     });
     setDom(`<section data-agent-action="list_accounts"></section>`);
@@ -79,6 +80,7 @@ describe("ArchitectureShowcase", () => {
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,
+      attempts: [{ raw: '{"type":"list_accounts","rawInputSummary":"show accounts"}', latencyMs: 1 }],
       rawOutputs: ['{"type":"list_accounts","rawInputSummary":"show accounts"}'],
     });
     setDom(`<section data-agent-action="list_accounts"></section>`);
@@ -109,6 +111,7 @@ describe("ArchitectureShowcase", () => {
       ok: true,
       intent: { type: "list_accounts", rawInputSummary: "show accounts" },
       retriesUsed: 0,
+      attempts: [{ raw: '{"type":"list_accounts","rawInputSummary":"show accounts"}', latencyMs: 1 }],
       rawOutputs: ['{"type":"list_accounts","rawInputSummary":"show accounts"}'],
     });
     setDom(`<section data-agent-action="list_accounts"></section>`);

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearWebLlmCache, checkStorageQuota } from "./intent-parser";
+import { clearWebLlmCache, checkStorageQuota } from "./webllm-engine";
 
 describe("clearWebLlmCache", () => {
   afterEach(() => {

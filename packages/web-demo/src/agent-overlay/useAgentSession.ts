@@ -3,6 +3,8 @@ import {
   evaluateIntent,
   AuditLog,
   parseIntent,
+  classifyRawOutput,
+  type AttemptRecord,
   WebLlmEngineClient,
   clearWebLlmCache,
   checkStorageQuota,
@@ -71,6 +73,29 @@ export interface AgentMessage {
 // budget on this machine and the ~1.9GB gemma-2-2b-it that originally failed
 // outright on disk space. See docs/implementation-log/phase-2-intent-parser.md.
 const MODEL_ID = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
+
+/**
+ * Persists every live chat parse (success, rejection, engine error) to
+ * evidence/live-app.jsonl via the dev server's evidence sink (vite.config.ts),
+ * so failures seen while actually using the app become countable data next to
+ * the benchmark results. Dev-server only; fire-and-forget.
+ */
+function logLiveParse(record: Record<string, unknown>): void {
+  if (!import.meta.env.DEV || import.meta.env.MODE === "test") return;
+  void fetch("/__evidence?stream=live-app", {
+    method: "POST",
+    body: JSON.stringify({ timestamp: new Date().toISOString(), platform: "web", engine: "webllm", modelId: MODEL_ID, ...record }),
+  }).catch(() => undefined);
+}
+
+function summarizeAttempts(attempts: AttemptRecord[]) {
+  return attempts.map((a) => ({
+    raw: a.raw.slice(0, 2000),
+    latencyMs: a.latencyMs,
+    rawClass: classifyRawOutput(a.raw),
+    failureKind: a.failure?.kind,
+  }));
+}
 
 export type ModelStatus = "idle" | "loading" | "ready" | "error";
 
@@ -194,6 +219,7 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
         setModelStatus("error");
         const message = err instanceof Error ? err.message : String(err);
         auditLogRef.current.recordRejected(text, `Engine error: ${message}`);
+        logLiveParse({ text, outcome: "engine_error", error: message, totalLatencyMs: elapsed() });
         setMessages((prev) => [
           ...prev,
           {
@@ -210,6 +236,14 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
 
       if (!result.ok) {
         auditLogRef.current.recordRejected(text, result.reason);
+        logLiveParse({
+          text,
+          outcome: "parse_failed",
+          reason: result.reason,
+          retriesUsed: result.retriesUsed,
+          attempts: summarizeAttempts(result.attempts),
+          totalLatencyMs: elapsed(),
+        });
         setMessages((prev) => [
           ...prev,
           {
@@ -231,6 +265,15 @@ export function useAgentSession({ onNavigate }: { onNavigate?: (screen: Screen) 
 
       const { decision, matchedRule } = evaluateIntent(result.intent);
       auditLogRef.current.recordParsed(text, result.intent, decision, matchedRule);
+      logLiveParse({
+        text,
+        outcome: "parsed",
+        intent: result.intent,
+        decision,
+        retriesUsed: result.retriesUsed,
+        attempts: summarizeAttempts(result.attempts),
+        totalLatencyMs: elapsed(),
+      });
 
       if (decision === "block") {
         setMessages((prev) => [
