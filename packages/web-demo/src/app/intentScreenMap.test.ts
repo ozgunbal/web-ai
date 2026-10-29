@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { INTENT_SCREEN_MAP } from "./intentScreenMap";
-import { IntentType } from "@web-ai-trials/core";
+import { IntentType } from "@web-ai/core";
 
 describe("INTENT_SCREEN_MAP", () => {
   it("maps every real IntentType enum value to a screen or null", () => {

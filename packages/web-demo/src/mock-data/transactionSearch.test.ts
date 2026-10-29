@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Transaction } from "@web-ai-trials/shared";
+import type { Transaction } from "@web-ai/shared";
 import { matchesQuery } from "./transactionSearch";
 import { SEED_TRANSACTIONS } from "./transactions";
 import { INJECTED_TRANSACTION_ID, INJECTED_NOTE_TEXT } from "../injection-scenario/fixture";

@@ -1,4 +1,4 @@
-import type { Intent } from "@web-ai-trials/core";
+import type { Intent } from "@web-ai/core";
 import { SEED_ACCOUNTS, SEED_PAYEES } from "../mock-data/accounts";
 
 /**

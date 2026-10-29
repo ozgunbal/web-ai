@@ -1,4 +1,4 @@
-# web-ai-trials — agent-augmented app demo
+# web-ai — agent-augmented app demo
 
 Implementation of `technical-implementation-plan.md`: a small agent (intent parser →
 deterministic guardrail → app adapter) layered on top of a mock banking app, on web
@@ -12,10 +12,10 @@ sites, no real money movement.
 
 ```
 packages/
-├── core/          # @web-ai-trials/core — schemas, guardrail, policy, intent parser
-├── shared/        # @web-ai-trials/shared — UI-facing DTOs
-├── web-demo/      # @web-ai-trials/web-demo — React + Vite mock bank + agent overlay
-└── mobile-demo/   # @web-ai-trials/mobile-demo — Expo mock bank + offline queue
+├── core/          # @web-ai/core — schemas, guardrail, policy, intent parser
+├── shared/        # @web-ai/shared — UI-facing DTOs
+├── web-demo/      # @web-ai/web-demo — React + Vite mock bank + agent overlay
+└── mobile-demo/   # @web-ai/mobile-demo — Expo mock bank + offline queue
 docs/
 ├── demo-script.md              # on-stage script for the live demo
 └── implementation-log/         # what was built, decisions made, gaps — per phase

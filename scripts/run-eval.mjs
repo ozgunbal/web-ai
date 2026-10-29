@@ -49,7 +49,7 @@ async function waitFor(url, label, timeoutMs = 60_000) {
 
 if (!(await isUp(DEV_URL))) {
   console.log("Starting web-demo dev server…");
-  spawn("pnpm", ["--filter", "@web-ai-trials/web-demo", "dev", "--port", "5173", "--strictPort"], {
+  spawn("pnpm", ["--filter", "@web-ai/web-demo", "dev", "--port", "5173", "--strictPort"], {
     cwd: ROOT,
     stdio: "ignore",
     detached: true,

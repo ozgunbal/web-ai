@@ -1,12 +1,12 @@
 {
-  "name": "@web-ai-trials/mobile-demo",
+  "name": "@web-ai/mobile-demo",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/netinfo": "^12.0.1",
-    "@web-ai-trials/core": "workspace:*",
-    "@web-ai-trials/shared": "workspace:*",
+    "@web-ai/core": "workspace:*",
+    "@web-ai/shared": "workspace:*",
     "expo": "~57.0.18",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",

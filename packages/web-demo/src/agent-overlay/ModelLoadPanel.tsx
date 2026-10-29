@@ -1,4 +1,4 @@
-import type { EngineLoadProgress } from "@web-ai-trials/core/web";
+import type { EngineLoadProgress } from "@web-ai/core/web";
 import type { ModelStatus } from "./useAgentSession";
 
 export function ModelLoadPanel({

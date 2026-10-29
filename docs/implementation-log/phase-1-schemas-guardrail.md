@@ -5,7 +5,7 @@ Status: **complete, fully verified in this environment.**
 ## What was built
 
 - `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.gitignore` (repo root)
-- `packages/core/package.json`, `tsconfig.json` — package `@web-ai-trials/core`
+- `packages/core/package.json`, `tsconfig.json` — package `@web-ai/core`
 - `packages/core/src/schema/intent.ts` — zod v4 discriminated union for all 6 intent
   types, plus `riskTierForIntent()`
 - `packages/core/src/schema/policy.ts` — `Decision`, `PolicyRule` zod schemas
@@ -43,9 +43,9 @@ Status: **complete, fully verified in this environment.**
    through to the fail-safe "block." We added an explicit "always confirm" rule instead,
    since blocking recurring payment setup outright seemed like an unintended gap rather
    than an intended security posture; flagged here for the user/PO to review.
-5. **npm scope: `@web-ai-trials/*`** (per user's explicit choice), not the spec's example
+5. **npm scope: `@web-ai/*`** (per user's explicit choice), not the spec's example
    `@agent-demo/*` — the spec's own folder-name example (`agent-demo/`) doesn't match
-   this repo's actual name (`web-ai-trials`).
+   this repo's actual name (`web-ai`).
 6. **zod v4.5.2** (exact-pinned), per user's explicit choice, not v3 as a Plan-agent
    draft had initially suggested for ecosystem-compatibility reasons. No API
    incompatibilities were hit for the schema patterns used here (`z.object`, `.extend`,
@@ -71,8 +71,8 @@ Status: **complete, fully verified in this environment.**
 ## Test results (actual)
 
 ```
-pnpm --filter @web-ai-trials/core typecheck   → PASS, no errors
-pnpm --filter @web-ai-trials/core test         → PASS, 2 files, 30 tests, 30 passed, 0 failed
+pnpm --filter @web-ai/core typecheck   → PASS, no errors
+pnpm --filter @web-ai/core test         → PASS, 2 files, 30 tests, 30 passed, 0 failed
 pnpm demo:guardrail                            → runs successfully, output matches
                                                   expected decisions for all 7 sample intents
 ```

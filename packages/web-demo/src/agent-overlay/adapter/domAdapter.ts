@@ -1,4 +1,4 @@
-import type { IntentType } from "@web-ai-trials/core";
+import type { IntentType } from "@web-ai/core";
 
 /**
  * Perception: scan the current document for [data-agent-action] containers,

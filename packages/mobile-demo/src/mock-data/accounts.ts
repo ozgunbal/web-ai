@@ -1,6 +1,6 @@
-import type { Account, Payee } from "@web-ai-trials/shared";
+import type { Account, Payee } from "@web-ai/shared";
 
-// Mirrors web-demo's mock-data shape via @web-ai-trials/shared DTOs for consistency
+// Mirrors web-demo's mock-data shape via @web-ai/shared DTOs for consistency
 // (spec doesn't require the two apps' seed data to be identical, but keeping the
 // account/payee ids aligned makes cross-referencing the demo scripts easier).
 export const SEED_ACCOUNTS: Account[] = [

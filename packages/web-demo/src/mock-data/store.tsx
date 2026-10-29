@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, type ReactNode } from "react";
-import type { Account, Transaction, Payee } from "@web-ai-trials/shared";
+import type { Account, Transaction, Payee } from "@web-ai/shared";
 import { SEED_ACCOUNTS } from "./accounts";
 import { SEED_TRANSACTIONS } from "./transactions";
 import { SEED_PAYEES } from "./payees";
@@ -16,7 +16,7 @@ type StoreAction =
   | { type: "ADD_PAYEE_AND_PAY"; payeeName: string; payeeAccountRef: string; amount: number; fromAccountId: string }
   | { type: "RESET" };
 
-const STORAGE_KEY = "web-ai-trials-store-v1";
+const STORAGE_KEY = "web-ai-store-v1";
 
 function loadInitialState(): StoreState {
   if (typeof window !== "undefined") {

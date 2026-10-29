@@ -9,12 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * DOM at a time, so the agent must navigate to the intent's owning screen
  * BEFORE executeIntent() looks for its [data-agent-action] container.
  *
- * Mocks @web-ai-trials/core/web so this test exercises the real navigation
+ * Mocks @web-ai/core/web so this test exercises the real navigation
  * logic (ensureCorrectScreen in useAgentSession.ts) without needing a real
  * WebGPU/WebLLM engine.
  */
-vi.mock("@web-ai-trials/core/web", async () => {
-  const actual = await vi.importActual<typeof import("@web-ai-trials/core/web")>("@web-ai-trials/core/web");
+vi.mock("@web-ai/core/web", async () => {
+  const actual = await vi.importActual<typeof import("@web-ai/core/web")>("@web-ai/core/web");
   return {
     ...actual,
     parseIntentTwoStage: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock("@web-ai-trials/core/web", async () => {
 });
 
 import { useAgentSession } from "./useAgentSession";
-import { parseIntentTwoStage } from "@web-ai-trials/core/web";
+import { parseIntentTwoStage } from "@web-ai/core/web";
 
 function setDom(html: string) {
   document.body.innerHTML = html;

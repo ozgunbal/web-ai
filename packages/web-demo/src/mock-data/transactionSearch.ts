@@ -1,4 +1,4 @@
-import type { Transaction, TransactionCategory } from "@web-ai-trials/shared";
+import type { Transaction, TransactionCategory } from "@web-ai/shared";
 
 /**
  * Deterministic keyword-to-category synonym table. This is the real fix for

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { POLICY_RULES, riskTierForIntent } from "@web-ai-trials/core/web";
+import { POLICY_RULES, riskTierForIntent } from "@web-ai/core/web";
 import type { useAgentSession, AgentMessage } from "../agent-overlay/useAgentSession";
 import { PipelineDiagram, type PipelineStage } from "./PipelineDiagram";
 

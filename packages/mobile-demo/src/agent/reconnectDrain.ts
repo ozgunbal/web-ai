@@ -1,4 +1,4 @@
-import { evaluateIntent, type Decision } from "@web-ai-trials/core";
+import { evaluateIntent, type Decision } from "@web-ai/core";
 import { readQueue, writeQueue, type QueuedItem } from "./offlineQueue";
 
 export interface DrainResultItem {

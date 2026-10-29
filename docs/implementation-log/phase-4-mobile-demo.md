@@ -35,7 +35,7 @@ simulator verification is a follow-up.**
 4. **`npx expo export --platform ios`** — this is beyond what the approved plan
    expected to be achievable ("cannot run simulator... build achievable"): Metro
    successfully bundled the entire app end-to-end — 704 modules resolved, including
-   `@web-ai-trials/core`'s guardrail/schema/policy code and all native module imports
+   `@web-ai/core`'s guardrail/schema/policy code and all native module imports
    (NetInfo, AsyncStorage) — producing a working `.hbc` bundle (2.1MB). This is strong
    evidence the app would run correctly on a real simulator/device, without having
    actually launched one.

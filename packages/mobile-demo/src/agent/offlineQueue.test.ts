@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { enqueueIfAllowed, readQueue, clearQueue } from "./offlineQueue";
-import type { Intent } from "@web-ai-trials/core";
+import type { Intent } from "@web-ai/core";
 
 const readOnlyIntent: Intent = { type: "list_accounts", rawInputSummary: "show accounts" };
 const moneyMovementIntent: Intent = {
@@ -51,7 +51,7 @@ describe("enqueueIfAllowed", () => {
     await enqueueIfAllowed({ type: "get_transactions", rawInputSummary: "recent" });
     const queue = await readQueue();
     expect(queue).toHaveLength(2);
-    const rawStored = await AsyncStorage.getItem("web-ai-trials-mobile-offline-queue-v1");
+    const rawStored = await AsyncStorage.getItem("web-ai-mobile-offline-queue-v1");
     expect(rawStored).not.toBeNull();
   });
 });

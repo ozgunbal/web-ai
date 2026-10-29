@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const STORAGE_KEY = "web-ai-trials-tour-seen-v1";
+const STORAGE_KEY = "web-ai-tour-seen-v1";
 
 /**
  * Tracks whether the guided tour has ever been offered/started, so the

@@ -1,6 +1,6 @@
 import { enqueueIfAllowed, readQueue, clearQueue } from "./offlineQueue";
 import { drainQueueOnReconnect } from "./reconnectDrain";
-import type { Intent } from "@web-ai-trials/core";
+import type { Intent } from "@web-ai/core";
 
 beforeEach(async () => {
   await clearQueue();

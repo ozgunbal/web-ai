@@ -15,7 +15,7 @@ import {
   type Intent,
   type Decision,
   type PolicyRule,
-} from "@web-ai-trials/core/web";
+} from "@web-ai/core/web";
 import { executeIntent } from "./adapter/executeIntent";
 import { INTENT_SCREEN_MAP } from "../app/intentScreenMap";
 import type { Screen } from "../app/Nav";

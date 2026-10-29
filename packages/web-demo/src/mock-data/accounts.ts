@@ -1,4 +1,4 @@
-import type { Account } from "@web-ai-trials/shared";
+import type { Account } from "@web-ai/shared";
 
 export const SEED_ACCOUNTS: Account[] = [
   { id: "acc-checking", name: "Everyday Checking", type: "checking", balance: 4230.55, currency: "USD" },

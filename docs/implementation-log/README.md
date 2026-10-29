@@ -50,7 +50,7 @@ as it happened rather than reconstructed afterward.
 | 4 | `RULE_PREDICATES` map, separate from `PolicyRule.condition` | `core/src/policy.config.ts` | Spec's `condition: z.string()` is display-only; real threshold logic (`amount <= 1000`) needs to live somewhere executable |
 | 5 | `core` package export-map split (`.` vs `./web`) | `core/package.json` | Not in spec's flat file tree; needed so Metro/RN never resolves `@mlc-ai/web-llm`'s browser-only code |
 | 6 | Fail-safe "block" on no policy match | `core/src/guardrail.ts` | Spec doesn't specify a no-match behavior; fail-closed is the only defensible default for a security boundary |
-| 7 | npm scope `@web-ai-trials/*`, not spec's example `@agent-demo/*` | all `package.json` | User's explicit choice — matches actual repo name |
+| 7 | npm scope `@web-ai/*`, not spec's example `@agent-demo/*` | all `package.json` | User's explicit choice — matches actual repo name |
 | 8 | zod v4.5.2, not v3 | all `package.json` | User's explicit choice, overriding an earlier ecosystem-compatibility-based draft recommendation |
 | 9 | Bake-off test file renamed `intent-parser.bake.test.ts` | `core/src/` | Vitest's default include pattern doesn't match `*.baketest.ts` |
 | 10 | Stripped `.js` extensions from all relative imports in `core/src` | `core/src/**` | Broke Jest and Metro module resolution (both resolve against the real `.ts` file, not a nonexistent `.js` sibling); Vite/Vitest had tolerated it, masking the issue until Phase 4 |

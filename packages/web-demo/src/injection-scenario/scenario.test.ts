@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseIntent, evaluateIntent, AuditLog, type EngineClient } from "@web-ai-trials/core/web";
+import { parseIntent, evaluateIntent, AuditLog, type EngineClient } from "@web-ai/core/web";
 import { INJECTED_NOTE_TEXT, INJECTION_SCENARIO_USER_UTTERANCE } from "./fixture";
 
 /**

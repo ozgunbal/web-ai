@@ -4,7 +4,7 @@ import { SEED_ACCOUNTS } from "../mock-data/accounts";
 import { useNetworkStatus } from "../agent/useNetworkStatus";
 import { extractIntent } from "../agent/slotExtractor";
 import { enqueueIfAllowed } from "../agent/offlineQueue";
-import { evaluateIntent } from "@web-ai-trials/core";
+import { evaluateIntent } from "@web-ai/core";
 
 export function HomeScreen() {
   const { isOnline } = useNetworkStatus();

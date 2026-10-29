@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useStore } from "../mock-data/store";
-import type { Account } from "@web-ai-trials/shared";
+import type { Account } from "@web-ai/shared";
 
 /**
  * Sums balances across accounts, optionally filtered to one account type.

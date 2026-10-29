@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { riskTierForIntent, type Decision, type Intent } from "@web-ai-trials/core";
+import { riskTierForIntent, type Decision, type Intent } from "@web-ai/core";
 
-const QUEUE_STORAGE_KEY = "web-ai-trials-mobile-offline-queue-v1";
+const QUEUE_STORAGE_KEY = "web-ai-mobile-offline-queue-v1";
 
 export interface QueuedItem {
   id: string;

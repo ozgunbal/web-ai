@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { UserContext } from "@web-ai-trials/core";
+import type { UserContext } from "@web-ai/core";
 import { StoreProvider, useStore } from "./mock-data/store";
 import { ToastProvider } from "./app/Toast";
 import { SEED_ACCOUNTS } from "./mock-data/accounts";

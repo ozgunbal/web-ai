@@ -14,7 +14,7 @@ NOT captured in this pass — see gap note below.**
     the zod `Intent` schema and never attempts to coerce/fix malformed output.
   - `WebLlmEngineClient` — real implementation using `@mlc-ai/web-llm`'s
     `CreateMLCEngine` + `chat.completions.create({ response_format: { type: "json_object" } })`.
-    Only reachable via `@web-ai-trials/core/web` (not the mobile-safe `.` export).
+    Only reachable via `@web-ai/core/web` (not the mobile-safe `.` export).
 - `packages/core/src/intent-parser.test.ts` — 7 tests against a stub engine: first-try
   success, JSON-in-markdown-fence extraction, retry-then-succeed, exhausted-retries
   failure, out-of-schema type rejection, missing-required-field rejection, and an
@@ -52,8 +52,8 @@ model family): `gemma-2-2b-it-q4f16_1-MLC` vs `Qwen2.5-1.5B-Instruct-q4f16_1-MLC
 ## Test results (actual)
 
 ```
-pnpm --filter @web-ai-trials/core test:intent-parser  → PASS, 1 file, 3 tests
-pnpm --filter @web-ai-trials/core test (full suite)    → PASS, 4 files, 40 tests, 0 failed
+pnpm --filter @web-ai/core test:intent-parser  → PASS, 1 file, 3 tests
+pnpm --filter @web-ai/core test (full suite)    → PASS, 4 files, 40 tests, 0 failed
 ```
 
 **Important:** the 3 bake-off self-tests above prove the harness's scoring/retry

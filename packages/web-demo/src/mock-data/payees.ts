@@ -1,4 +1,4 @@
-import type { Payee } from "@web-ai-trials/shared";
+import type { Payee } from "@web-ai/shared";
 
 export const SEED_PAYEES: Payee[] = [
   { id: "payee-jane", name: "Jane Smith", accountRef: "external-ref-jane-001" },

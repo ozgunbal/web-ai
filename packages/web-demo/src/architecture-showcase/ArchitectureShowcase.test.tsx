@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Same mocking approach as useAgentSession.navigation.test.tsx: exercise the
 // real session/guardrail/policy pipeline, stub only the on-device model call.
-vi.mock("@web-ai-trials/core/web", async () => {
-  const actual = await vi.importActual<typeof import("@web-ai-trials/core/web")>("@web-ai-trials/core/web");
+vi.mock("@web-ai/core/web", async () => {
+  const actual = await vi.importActual<typeof import("@web-ai/core/web")>("@web-ai/core/web");
   return {
     ...actual,
     parseIntentTwoStage: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock("@web-ai-trials/core/web", async () => {
 });
 
 import { useAgentSession } from "../agent-overlay/useAgentSession";
-import { parseIntentTwoStage, POLICY_RULES } from "@web-ai-trials/core/web";
+import { parseIntentTwoStage, POLICY_RULES } from "@web-ai/core/web";
 import { ArchitectureShowcase } from "./ArchitectureShowcase";
 
 function setDom(html: string) {

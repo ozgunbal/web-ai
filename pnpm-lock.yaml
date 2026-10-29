@@ -45,10 +45,10 @@ importers:
       '@react-native-community/netinfo':
         specifier: ^12.0.1
         version: 12.0.1(react-native@0.86.3(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
-      '@web-ai-trials/core':
+      '@web-ai/core':
         specifier: workspace:*
         version: link:../core
-      '@web-ai-trials/shared':
+      '@web-ai/shared':
         specifier: workspace:*
         version: link:../shared
       expo:
@@ -88,10 +88,10 @@ importers:
 
   packages/web-demo:
     dependencies:
-      '@web-ai-trials/core':
+      '@web-ai/core':
         specifier: workspace:*
         version: link:../core
-      '@web-ai-trials/shared':
+      '@web-ai/shared':
         specifier: workspace:*
         version: link:../shared
       react:

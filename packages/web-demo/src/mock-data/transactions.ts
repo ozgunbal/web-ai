@@ -1,4 +1,4 @@
-import type { Transaction } from "@web-ai-trials/shared";
+import type { Transaction } from "@web-ai/shared";
 import { INJECTED_TRANSACTION_ID, INJECTED_NOTE_TEXT } from "../injection-scenario/fixture";
 
 export const SEED_TRANSACTIONS: Transaction[] = [

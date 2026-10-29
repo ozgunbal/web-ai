@@ -6,7 +6,7 @@ import {
   runEvalCase,
   WebLlmEngineClient,
   type EvalRecord,
-} from "@web-ai-trials/core/web";
+} from "@web-ai/core/web";
 
 /**
  * Benchmark page (eval.html). Runs every model x prompt variant x labeled
