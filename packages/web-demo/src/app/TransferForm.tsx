@@ -1,23 +1,31 @@
 import { useState } from "react";
 import { useStore } from "../mock-data/store";
+import { formatAmount, PROCESSING_MS, SubmitButton, useProcessing, wait } from "./processing";
+import { useToast } from "./Toast";
 
 export function TransferForm() {
   const { state, dispatch } = useStore();
   const [fromAccountId, setFromAccountId] = useState(state.accounts[0]?.id ?? "");
   const [toAccountId, setToAccountId] = useState(state.accounts[1]?.id ?? "");
   const [amount, setAmount] = useState("");
+  const showToast = useToast();
+  const { busy, start, finish } = useProcessing();
+  const accountName = (id: string) => state.accounts.find((a) => a.id === id)?.name ?? id;
 
   return (
     <form
       className="card"
       data-agent-action="transfer_internal"
       data-tour="transfer-screen"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         const parsed = Number(amount);
-        if (!fromAccountId || !toAccountId || !parsed) return;
+        if (!fromAccountId || !toAccountId || !parsed || !start()) return;
+        await wait(PROCESSING_MS);
         dispatch({ type: "TRANSFER_INTERNAL", fromAccountId, toAccountId, amount: parsed });
+        showToast(`Moved ${formatAmount(parsed)} from ${accountName(fromAccountId)} to ${accountName(toAccountId)}`);
         setAmount("");
+        finish();
       }}
     >
       <h2 className="section-title">Transfer between my accounts</h2>
@@ -64,9 +72,7 @@ export function TransferForm() {
           onChange={(e) => setAmount(e.target.value)}
         />
       </div>
-      <button type="submit" className="btn-primary" data-agent-submit="transfer_internal">
-        Transfer
-      </button>
+      <SubmitButton busy={busy} label="Transfer" busyLabel="Transferring…" agentSubmit="transfer_internal" />
     </form>
   );
 }

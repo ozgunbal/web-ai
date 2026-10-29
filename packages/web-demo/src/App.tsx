@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UserContext } from "@web-ai-trials/core";
 import { StoreProvider, useStore } from "./mock-data/store";
+import { ToastProvider } from "./app/Toast";
 import { SEED_ACCOUNTS } from "./mock-data/accounts";
 import { SEED_PAYEES } from "./mock-data/payees";
 import { Nav, type Screen } from "./app/Nav";
@@ -55,44 +56,46 @@ export function App() {
 
   return (
     <StoreProvider>
-      <UserContextBridge target={userContextRef} />
-      <div className="shell">
-        <div className="main-column">
-          <div className="topbar">
-            <div className="brand">
-              <div className="brand-mark">MB</div>
-              <div>
-                <div className="brand-name">Mock Bank</div>
-                <div className="brand-tag">Agent demo</div>
+      <ToastProvider>
+        <UserContextBridge target={userContextRef} />
+        <div className="shell">
+          <div className="main-column">
+            <div className="topbar">
+              <div className="brand">
+                <div className="brand-mark">MB</div>
+                <div>
+                  <div className="brand-name">Mock Bank</div>
+                  <div className="brand-tag">Agent demo</div>
+                </div>
+              </div>
+              <div className="topbar-actions">
+                <button className="tour-button" onClick={startTour}>
+                  <span className="sparkle">✦</span> Guided tour
+                </button>
+                <button className="tour-button showcase-button" onClick={() => setShowcaseActive(true)}>
+                  <span className="sparkle">◈</span> Live architecture
+                </button>
               </div>
             </div>
-            <div className="topbar-actions">
-              <button className="tour-button" onClick={startTour}>
-                <span className="sparkle">✦</span> Guided tour
-              </button>
-              <button className="tour-button showcase-button" onClick={() => setShowcaseActive(true)}>
-                <span className="sparkle">◈</span> Live architecture
-              </button>
-            </div>
+
+            <Nav current={screen} onChange={setScreen} />
+            {screen === "accounts" && <AccountsScreen />}
+            {screen === "transactions" && <TransactionsScreen />}
+            {screen === "transfer" && <TransferForm />}
+            {screen === "pay" && <PayPayeeForm />}
           </div>
 
-          <Nav current={screen} onChange={setScreen} />
-          {screen === "accounts" && <AccountsScreen />}
-          {screen === "transactions" && <TransactionsScreen />}
-          {screen === "transfer" && <TransferForm />}
-          {screen === "pay" && <PayPayeeForm />}
+          <AgentOverlay registerHandle={registerAgentHandle} session={session} />
         </div>
 
-        <AgentOverlay registerHandle={registerAgentHandle} session={session} />
-      </div>
+        {tourActive && (
+          <GuidedTour onScreenChange={setScreen} agentHandle={agentHandle} onClose={() => setTourActive(false)} />
+        )}
 
-      {tourActive && (
-        <GuidedTour onScreenChange={setScreen} agentHandle={agentHandle} onClose={() => setTourActive(false)} />
-      )}
+        {!tourActive && showNudge && <TourNudge onStart={startTour} onDismiss={dismissNudge} />}
 
-      {!tourActive && showNudge && <TourNudge onStart={startTour} onDismiss={dismissNudge} />}
-
-      {showcaseActive && <ArchitectureShowcase session={session} onClose={() => setShowcaseActive(false)} />}
+        {showcaseActive && <ArchitectureShowcase session={session} onClose={() => setShowcaseActive(false)} />}
+      </ToastProvider>
     </StoreProvider>
   );
 }

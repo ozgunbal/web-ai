@@ -1,9 +1,14 @@
 import { useState } from "react";
 import { useStore } from "../mock-data/store";
+import { formatAmount, PROCESSING_MS, SubmitButton, useProcessing, wait } from "./processing";
+import { useToast } from "./Toast";
 
 export function PayPayeeForm() {
   const { state, dispatch } = useStore();
+  const showToast = useToast();
+  const { busy, start, finish } = useProcessing();
   const [mode, setMode] = useState<"known" | "new">("known");
+  const accountName = (id: string) => state.accounts.find((a) => a.id === id)?.name ?? id;
   const [payeeId, setPayeeId] = useState(state.payees[0]?.id ?? "");
   const [payeeName, setPayeeName] = useState("");
   const [payeeAccountRef, setPayeeAccountRef] = useState("");
@@ -30,12 +35,16 @@ export function PayPayeeForm() {
       {mode === "known" ? (
         <form
           data-agent-action="pay_known_payee"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             const parsed = Number(amount);
-            if (!payeeId || !parsed) return;
+            if (!payeeId || !parsed || !start()) return;
+            await wait(PROCESSING_MS);
             dispatch({ type: "PAY_PAYEE", payeeId, amount: parsed, fromAccountId });
+            const payee = state.payees.find((p) => p.id === payeeId)?.name ?? payeeId;
+            showToast(`Paid ${formatAmount(parsed)} to ${payee} from ${accountName(fromAccountId)}`);
             setAmount("");
+            finish();
           }}
         >
           <div className="field-group">
@@ -78,18 +87,19 @@ export function PayPayeeForm() {
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
-          <button type="submit" className="btn-primary" data-agent-submit="pay_known_payee">
-            Pay
-          </button>
+          <SubmitButton busy={busy} label="Pay" busyLabel="Paying…" agentSubmit="pay_known_payee" />
         </form>
       ) : (
         <form
           data-agent-action="add_payee_and_pay"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             const parsed = Number(amount);
-            if (!payeeName || !payeeAccountRef || !parsed) return;
+            if (!payeeName || !payeeAccountRef || !parsed || !start()) return;
+            await wait(PROCESSING_MS);
             dispatch({ type: "ADD_PAYEE_AND_PAY", payeeName, payeeAccountRef, amount: parsed, fromAccountId });
+            showToast(`Added ${payeeName} as a payee and paid ${formatAmount(parsed)} from ${accountName(fromAccountId)}`);
+            finish();
             setPayeeName("");
             setPayeeAccountRef("");
             setAmount("");
@@ -138,9 +148,7 @@ export function PayPayeeForm() {
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
-          <button type="submit" className="btn-primary" data-agent-submit="add_payee_and_pay">
-            Add payee and pay
-          </button>
+          <SubmitButton busy={busy} label="Add payee and pay" busyLabel="Paying…" agentSubmit="add_payee_and_pay" />
         </form>
       )}
     </div>

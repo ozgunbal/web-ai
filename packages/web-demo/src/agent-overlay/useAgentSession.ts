@@ -394,7 +394,7 @@ export function useAgentSession({
         ]);
         return;
       }
-      const execResult = executeIntent(intent);
+      const execResult = await executeIntent(intent);
       setMessages((prev) => [
         ...prev,
         {
@@ -457,7 +457,7 @@ export function useAgentSession({
         ]);
         return;
       }
-      const execResult = executeIntent(message.intent);
+      const execResult = await executeIntent(message.intent);
       setMessages((prev) => [
         ...prev,
         {

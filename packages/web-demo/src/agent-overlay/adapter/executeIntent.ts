@@ -15,6 +15,15 @@ export interface ExecuteResult {
 const HIGHLIGHT_DURATION_MS = 2500;
 
 /**
+ * How long filled-in fields stay visible before the agent presses submit.
+ * Filling and submitting in the same tick meant the user never saw what the
+ * agent typed: the forms reset their own state after a successful submit
+ * (TransferForm, PayPayeeForm), so the amount input went from "" to "" with
+ * the real value existing for less than one frame. Observed live.
+ */
+export const SUBMIT_DELAY_MS = 900;
+
+/**
  * Marks the elements an ALLOWED intent actually touched so it's visually
  * obvious this came from the agent, not a human clicking around — a distinct
  * color from the browser's native focus ring (which still means "a human just
@@ -54,8 +63,16 @@ function flashAgentHighlight(container: Element): void {
  * On success, also visually flags what the agent just did (see
  * flashAgentTouched/flashAgentHighlight above) so a human watching the screen
  * can immediately tell it was the agent, not them, and where to look.
+ *
+ * Fields are filled and highlighted first, then the submit is pressed after
+ * `submitDelayMs` (see SUBMIT_DELAY_MS), the way a person would review a form
+ * before pressing the button.
  */
-export function executeIntent(intent: Intent, root: ParentNode = document): ExecuteResult {
+export async function executeIntent(
+  intent: Intent,
+  root: ParentNode = document,
+  { submitDelayMs = SUBMIT_DELAY_MS }: { submitDelayMs?: number } = {},
+): Promise<ExecuteResult> {
   const container = findActionContainer(intent.type, root);
   if (!container) {
     return { ok: false, reason: `No [data-agent-action="${intent.type}"] element found on current screen.` };
@@ -76,7 +93,12 @@ export function executeIntent(intent: Intent, root: ParentNode = document): Exec
 
   const submit = container.querySelector<HTMLElement>(`[data-agent-submit="${intent.type}"]`);
   if (submit) {
-    flashAgentTouched([...touchedFields, submit]);
+    flashAgentTouched(touchedFields);
+    if (submitDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, submitDelayMs));
+    if (!submit.isConnected) {
+      return { ok: false, reason: "The form was closed before the agent could submit it. Nothing was executed." };
+    }
+    flashAgentTouched([submit]);
     submit.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     return { ok: true };
   }
